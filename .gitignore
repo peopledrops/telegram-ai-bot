@@ -1,4 +1,5 @@
-node_modules/
+# Buat/update .gitignore
+Set-Content -Path .gitignore -Value "node_modules/
 .env
 .env.local
 test-*.js
@@ -9,3 +10,4 @@ user-profiles.json
 airdrop-data.json
 .DS_Store
 Thumbs.db
+npm-debug.log"
