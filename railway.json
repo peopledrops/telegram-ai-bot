@@ -1,8 +1,0 @@
-﻿{
-  "build": {
-    "buildCommand": "npm install --legacy-peer-deps"
-  },
-  "deploy": {
-    "startCommand": "node index.js"
-  }
-}
