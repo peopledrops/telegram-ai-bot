@@ -8,6 +8,7 @@ const MineBeanSkill = require('./minebean');
 const airdropManager = require('./airdrop');
 const profileManager = require('./user-profiles');
 const formAutoFiller = require('./form-autofill');
+const nlParser = require('./nl-command-parser');
 // Message deduplication store
 const processedMessages = new Map();
 const MESSAGE_TTL = 5000; // 5 seconds
@@ -1079,7 +1080,7 @@ bot.onText(/\/quickfill\s+(\w+)/i, async (msg, match) => {
 });
 
 // Import NL parser
-const nlParser = require('./nl-command-parser');
+
 
 // ===== MESSAGE HANDLER: AI CHAT (Fallback Only) =====
 // ===== AI CHAT HANDLER (Fallback) =====
