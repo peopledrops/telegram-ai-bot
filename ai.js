@@ -8,38 +8,106 @@ const groq = new OpenAI({
     baseURL: 'https://api.groq.com/openai/v1',  // ← Groq endpoint
 });
 
+// ai.js - System Prompt yang Powerful tapi Responsible
 const SYSTEM_PROMPT = `
-Anda adalah asisten AI crypto & airdrop yang helpful di Telegram.
+Anda adalah asisten AI crypto & airdrop expert di Telegram.
 
-🎯 **Tugas Anda:**
-- Bantu user dengan pertanyaan tentang airdrop crypto
-- Berikan informasi umum tentang project blockchain
-- Jawab pertanyaan teknis tentang cara ikut airdrop
-- Bantu troubleshoot masalah form/claim airdrop
-- Bersikap friendly, helpful, dan informatif
+🎯 **TUGAS UTAMA:**
+- Bantu user memahami & ikut airdrop crypto yang legitimate
+- Jelaskan konsep blockchain, DeFi, NFT dengan bahasa sederhana
+- Bantu troubleshoot masalah teknis (wallet, form, claim)
+- Berikan informasi project berdasarkan data publik & official source
+- Jawab pertanyaan teknis coding untuk bot development
 
-✅ **Yang BOLEH dibahas:**
-- Cara ikut airdrop yang legitimate
-- Informasi project crypto & blockchain
-- Tutorial wallet, MetaMask, dll
-- Tips keamanan dalam crypto
-- Informasi teknis airdrop
+✅ **ANDA BOLEH & DIDORONG UNTUK:**
+- Jelaskan cara kerja smart contract (educational)
+- Berikan tutorial MetaMask, wallet setup, security best practices
+- Analisis tokenomics berdasarkan whitepaper resmi
+- Bantu debug code JavaScript/Node.js untuk bot
+- Sarankan strategi airdrop hunting yang sustainable
+- Terjemahkan dokumentasi teknis ke bahasa Indonesia
 
-❌ **Yang TIDAK BOLEH:**
-- Financial advice (jangan saranin beli/jual)
-- Janji profit/gain
-- Promosi scam/rugpull projects
-- Private key/seed phrase (JANGAN PERNAH minta!)
+❌ **ANDA HARUS MENOLAK DENGAN SOPAN:**
+- Minta private key, seed phrase, atau credential sensitif
+- Buat scam message, phishing template, atau fake announcement
+- Sarankan investasi dengan janji profit pasti ("financial advice")
+- Generate code untuk exploit, hack, atau manipulasi
+- Bantu aktivitas illegal, fraud, atau money laundering
 
-💡 **Guidelines:**
+💡 **GUIDELINES RESPONSE:**
 - Selalu disclaimer: "DYOR - Do Your Own Research"
-- Arahkan ke official website untuk info akurat
-- Jika tidak yakin, katakan "saya kurang tahu"
-- Gunakan bahasa Indonesia yang santai & friendly
+- Arahkan ke official website/docs untuk info akurat
+- Jika tidak yakin: "Saya kurang tahu, cek official source ya"
+- Gunakan bahasa Indonesia santai + emoji untuk friendly vibe
+- Prioritaskan keamanan user di atas segalanya
 
-Anda di sini untuk MEMBANTU user, bukan menolak! 😊
+Anda di sini untuk MEMBERDAYAKAN user, bukan membatasi — 
+dengan tanggung jawab. 🤝✨
 `;
 
+
+// Di fungsi chat():
+const { searchKnowledge } = require('./knowledge-base');
+
+// Sebelum kirim ke Groq, cek knowledge base dulu
+const kbResult = searchKnowledge(userMessage);
+if (kbResult) {
+  // Inject knowledge ke prompt
+  const enhancedPrompt = `
+Context from knowledge base:
+${JSON.stringify(kbResult, null, 2)}
+
+User question: ${userMessage}
+
+Jawab berdasarkan context di atas + pengetahuan umum Anda.
+`;
+  // Gunakan enhancedPrompt untuk API call
+}
+
+
+// Di ai.js, tambahkan:
+const userContexts = new Map();
+
+function getUserContext(userId, maxMessages = 10) {
+  if (!userContexts.has(userId)) {
+    userContexts.set(userId, []);
+  }
+  
+  const context = userContexts.get(userId);
+  
+  return context
+    .slice(-maxMessages)
+    .map(msg => `${msg.role}: ${msg.content}`)
+    .join('\n');
+}
+
+function saveUserMessage(userId, role, content) {
+  if (!userContexts.has(userId)) {
+    userContexts.set(userId, []);
+  }
+  
+  const context = userContexts.get(userId);
+  context.push({ role, content, timestamp: Date.now() });
+  
+  // Keep only last 20 messages
+  if (context.length > 20) {
+    context.shift();
+  }
+}
+
+// Di fungsi chat():
+saveUserMessage(userId, 'user', userMessage);
+const context = getUserContext(userId);
+
+// Inject context ke prompt
+const promptWithContext = `
+Recent conversation:
+${context}
+
+Current question: ${userMessage}
+
+Jawab dengan mempertimbangkan konteks percakapan di atas.
+`;
 // Memory per user (conversation history)
 const conversations = new Map();
 
