@@ -741,6 +741,7 @@ bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
 // ===== MESSAGE HANDLER: AI CHAT =====
 
 // ===== NATURAL LANGUAGE MESSAGE HANDLER =====
+// ===== NATURAL LANGUAGE MESSAGE HANDLER =====
 bot.on('message', async (msg) => {
     // Skip if it's a command
     if (msg.text?.startsWith('/')) {
@@ -753,10 +754,10 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
     const messageId = msg.message_id;
-    const message = msg.text.trim();
+    const userMessage = msg.text.trim();  // ✅ DEFINISIKAN DI SIN
     
     // Skip very short messages
-    if (message.length < 3) return;
+    if (userMessage.length < 3) return;
     
     // Check for duplicate processing
     if (isMessageProcessed(messageId, userId)) {
@@ -764,16 +765,16 @@ bot.on('message', async (msg) => {
         return;
     }
     
-    console.log(`💬 NL Message from ${userId}: "${message}"`);
+    console.log(`💬 NL Message from ${userId}: "${userMessage}"`);
     
     try {
         // Show typing indicator
         await bot.sendChatAction(chatId, 'typing');
         
         // Parse natural language
-        const parsed = await nlParser.parse(message, userId, {
+        const parsed = await nlParser.parse(userMessage, userId, {
             previousIntent: nlParser.getRecentContext(userId, 1)[0]?.intent,
-            extractedUrl: message.match(/https?:\/\/[^\s]+/)?.[0]
+            extractedUrl: userMessage.match(/https?:\/\/[^\s]+/)?.[0]
         });
         
         console.log(`🧠 Parsed: intent=${parsed.intent}, confidence=${parsed.confidence}`);
@@ -796,7 +797,7 @@ bot.on('message', async (msg) => {
         msg._processed = true;
         
         // Execute handler
-        const result = await executeParsedIntent(parsed, userId, chatId, message);
+        const result = await executeParsedIntent(parsed, userId, chatId, userMessage);
         
         // Send result safely
         if (result) {
@@ -820,10 +821,8 @@ bot.on('message', async (msg) => {
         
     } catch (error) {
         console.error('❌ NL handler error:', error);
-        // Don't send error to avoid spam
     }
 });
-
 
 bot.onText(/\/setprofile(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
@@ -1083,10 +1082,10 @@ bot.onText(/\/quickfill\s+(\w+)/i, async (msg, match) => {
 const nlParser = require('./nl-command-parser');
 
 // ===== MESSAGE HANDLER: AI CHAT (Fallback Only) =====
+// ===== AI CHAT HANDLER (Fallback) =====
 bot.on('message', async (msg) => {
     // Skip if already processed
     if (msg._processed) {
-        console.log('⏭️ Message already processed by NL handler');
         return;
     }
     
@@ -1101,16 +1100,10 @@ bot.on('message', async (msg) => {
     
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
-    const userMessage = msg.text;
+    const userMessage = msg.text;  // ✅ DEFINISIKAN
     
     // Skip very short messages
     if (userMessage.trim().length < 5) return;
-    
-    // Skip if contains URL (likely airdrop-related, already handled by NL)
-    if (userMessage.includes('http')) {
-        console.log('⏭️ Message contains URL, skipping AI chat');
-        return;
-    }
     
     console.log(`🤖 AI Chat fallback for: "${userMessage}"`);
     
@@ -1124,18 +1117,9 @@ bot.on('message', async (msg) => {
         }
     } catch (error) {
         console.error('❌ Bot Error:', error.message);
-        // Don't send error message to avoid spam
     }
 });
-/**
- * Execute parsed intent - router function
- */
-/**
- * Execute parsed intent - router function
- */
-/**
- * Execute parsed intent - router function
- */
+ 
 async function executeParsedIntent(parsed, userId, chatId, originalMessage) {
     console.log(`⚡ Executing intent: ${parsed.intent}`);
     
