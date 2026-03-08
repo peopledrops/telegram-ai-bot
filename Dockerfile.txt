@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+# Install Chromium untuk Puppeteer
+RUN apk add --no-cache chromium
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --legacy-peer-deps
+
+# Copy semua file
+COPY . .
+
+# Expose port (optional)
+EXPOSE 3000
+
+# Start bot
+CMD ["node", "index.js"]
