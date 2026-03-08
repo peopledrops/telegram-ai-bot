@@ -1,5 +1,5 @@
 // form-autofill.js - MINIMAL WORKING VERSION
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const profileManager = require('./user-profiles');
 const fs = require('fs').promises;
 const path = require('path');
@@ -37,6 +37,7 @@ async launchBrowser() {
         ]
     };
     
+
     if (isProduction) {
         // Use system Chromium in Docker
         launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
