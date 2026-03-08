@@ -1,11 +1,13 @@
 {
   "name": "telegram-ai-bot",
   "version": "1.0.0",
-  "description": "AI Telegram Bot",
+  "description": "AI Telegram Bot with Airdrop Automation",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "build": "echo 'No build step needed'",
+    "postinstall": "echo 'Dependencies installed successfully'"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -17,6 +19,6 @@
     "ethers": "^6.11.0",
     "node-telegram-bot-api": "^0.64.0",
     "openai": "^4.28.0",
-    "puppeteer": "^21.7.0"
+    "puppeteer-core": "^21.11.0"
   }
 }

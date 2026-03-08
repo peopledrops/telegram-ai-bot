@@ -1,21 +1,53 @@
-FROM node:18-alpine
+# Use Node.js slim image
+FROM node:18-slim
 
-# Install Chromium untuk Puppeteer
-RUN apk add --no-cache chromium
+# Install only essential packages for Puppeteer
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
+    libxss1 \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
+# Set environment variables
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV NODE_ENV=production
+
+# Create app directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies (faster with cache)
+RUN npm ci --only=production --legacy-peer-deps
 
-# Copy semua file
+# Copy application files
 COPY . .
 
-# Expose port (optional)
+# Create necessary directories
+RUN mkdir -p screenshots
+
+# Expose port (optional for health checks)
 EXPOSE 3000
 
-# Start bot
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD node -e "console.log('OK')" || exit 1
+
+# Start the bot
 CMD ["node", "index.js"]

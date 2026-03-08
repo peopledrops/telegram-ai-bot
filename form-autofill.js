@@ -11,24 +11,42 @@ const formAutoFiller = {
     
     browser: null,
     
-    async launchBrowser() {
-        if (this.browser) return this.browser;
-        console.log('🌐 Launching browser...');
-        this.browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--window-size=1920x1080']
-        });
-        console.log('✅ Browser launched');
-        return this.browser;
-    },
+    // Di fungsi launchBrowser():
+async launchBrowser() {
+    if (this.browser) return this.browser;
     
-    async closeBrowser() {
-        if (this.browser) {
-            console.log('🔒 Closing browser...');
-            await this.browser.close();
-            this.browser = null;
-        }
-    },
+    console.log('🌐 Launching browser...');
+    
+    // Detect if running in Docker/production
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                         process.env.RAILWAY || 
+                         process.env.DYNO; // Heroku
+    
+    const launchOptions = {
+        headless: 'new',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--window-size=1920x1080',
+            '--single-process',
+            '--no-zygote',
+            '--disable-software-rasterizer'
+        ]
+    };
+    
+    if (isProduction) {
+        // Use system Chromium in Docker
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
+        launchOptions.ignoreHTTPSErrors = true;
+    }
+    
+    this.browser = await puppeteer.launch(launchOptions);
+    console.log('✅ Browser launched');
+    return this.browser;
+},
     
     async autoSubmitForm(url, userId, options = {}) {
         console.log(`🚀 autoSubmitForm: ${url} for user ${userId}`);
