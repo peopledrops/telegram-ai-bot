@@ -1,0 +1,95 @@
+[
+  {
+    "id": "1",
+    "name": "Zealy Campaign",
+    "description": "Follow Twitter + Join Telegram + Submit Form",
+    "reward": "500-2000 XP + Potential Airdrop",
+    "tasks": [
+      {
+        "type": "twitter",
+        "label": "Follow @Zealy_io",
+        "url": "https://twitter.com/Zealy_io",
+        "required": true
+      },
+      {
+        "type": "telegram",
+        "label": "Join Zealy Telegram",
+        "url": "https://t.me/zealy_io",
+        "required": true
+      },
+      {
+        "type": "google_form",
+        "label": "Submit Wallet Address",
+        "url": "https://forms.gle/xxxxx",
+        "required": true,
+        "fields": [
+          "wallet",
+          "email",
+          "twitter_username"
+        ]
+      }
+    ],
+    "status": "active",
+    "deadline": "2026-03-31"
+  },
+  {
+    "id": "2",
+    "name": "Galxe Campaign",
+    "description": "Complete social tasks for NFT badge",
+    "reward": "NFT Badge + OAT",
+    "tasks": [
+      {
+        "type": "twitter",
+        "label": "Follow @Galxe",
+        "url": "https://twitter.com/Galxe",
+        "required": true
+      },
+      {
+        "type": "twitter",
+        "label": "Retweet Pinned Post",
+        "url": "https://twitter.com/Galxe/status/xxx",
+        "required": false
+      },
+      {
+        "type": "telegram",
+        "label": "Join Galxe Telegram",
+        "url": "https://t.me/GalxeOfficial",
+        "required": true
+      }
+    ],
+    "status": "active",
+    "deadline": "2026-04-15"
+  },
+  {
+    "id": "3",
+    "name": "LayerZero Airdrop",
+    "description": "Bridge + Social Tasks",
+    "reward": "$ZRO Token Airdrop",
+    "tasks": [
+      {
+        "type": "twitter",
+        "label": "Follow @LayerZero_Labs",
+        "url": "https://twitter.com/LayerZero_Labs",
+        "required": true
+      },
+      {
+        "type": "discord",
+        "label": "Join Discord",
+        "url": "https://discord.gg/layerzero",
+        "required": true
+      },
+      {
+        "type": "google_form",
+        "label": "Submit Wallet",
+        "url": "https://forms.gle/yyyyy",
+        "required": true,
+        "fields": [
+          "wallet",
+          "email"
+        ]
+      }
+    ],
+    "status": "active",
+    "deadline": "2026-05-01"
+  }
+]

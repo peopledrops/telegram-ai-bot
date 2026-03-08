@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1772944150087",
+    "learnedAt": "2026-03-08T04:29:10.087Z",
+    "success": true,
+    "platform": "Galxe",
+    "url": "https://app.galxe.com/quest/AGNTHub/GCxw2tYbm2",
+    "name": "Galxe Campaign",
+    "description": "Galxe OAT/NFT Campaign",
+    "tasks": [
+      {
+        "type": "twitter_follow",
+        "label": "Follow Twitter",
+        "url": null,
+        "required": true
+      },
+      {
+        "type": "telegram_join",
+        "label": "Join Telegram",
+        "url": null,
+        "required": true
+      }
+    ],
+    "reward": "NFT Badge + OAT",
+    "deadline": null
+  },
+  {
+    "id": "1772950667736",
+    "success": true,
+    "url": "https://probechain.org/airdrop/",
+    "platform": "unknown",
+    "name": "ProbeChain Rydberg Airdrop — Claim PRO Tokens",
+    "description": "Complete tasks to participate",
+    "tasks": [
+      {
+        "type": "discord_join",
+        "label": "discord",
+        "url": "https://discord.com/invite/QXanEptp75"
+      },
+      {
+        "type": "twitter_follow",
+        "label": "twitter",
+        "url": "https://twitter.com/ProbeBuilders"
+      }
+    ]
+  }
+]
