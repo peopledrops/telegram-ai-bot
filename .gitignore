@@ -1,25 +1,19 @@
-# Environment variables
-.env
-.env.local
-.env.production
-
 # Dependencies
 node_modules/
+
+# Lock file - biarkan npm generate ulang
+package-lock.json
+
+# Environment variables
+.env
+
+# Screenshots dari autofill
+screenshots/
 
 # Logs
 *.log
 npm-debug.log*
 
-# Data files
-screenshots/
-learned-airdrops.json
-user-profiles.json
-airdrop-data.json
-
 # OS files
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
