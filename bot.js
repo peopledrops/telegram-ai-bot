@@ -47,20 +47,38 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
 });
 
 // ✅ Clear webhook & pastikan tidak ada instance lain sebelum start polling
-async function startBot() {
+async function startBot(attempt = 1) {
     try {
-        console.log('🔄 Clearing webhook & previous sessions...');
+        console.log(`🔄 Starting bot (attempt ${attempt})...`);
+
+        // Step 1: Stop polling dulu kalau sedang jalan
+        try { await bot.stopPolling(); } catch (e) {}
+
+        // Step 2: Force delete webhook + drop semua pending updates
         await bot.deleteWebHook({ drop_pending_updates: true });
-        await new Promise(r => setTimeout(r, 2000)); // tunggu 2 detik
-        await bot.startPolling();
+        console.log('✅ Webhook cleared');
+
+        // Step 3: Tunggu lebih lama agar Telegram server release lock
+        const waitTime = Math.min(attempt * 3000, 15000); // max 15 detik
+        console.log(`⏳ Waiting ${waitTime/1000}s for Telegram to release lock...`);
+        await new Promise(r => setTimeout(r, waitTime));
+
+        // Step 4: Start polling
+        await bot.startPolling({ restart: false });
         console.log('✅ Bot polling started successfully');
+
     } catch (err) {
-        console.error('❌ Failed to start polling:', err.message);
-        // Coba lagi setelah 5 detik
-        setTimeout(startBot, 5000);
+        console.error(`❌ Start attempt ${attempt} failed:`, err.message);
+        if (attempt < 10) {
+            setTimeout(() => startBot(attempt + 1), 5000);
+        } else {
+            console.error('❌ Max retries reached. Bot failed to start.');
+        }
     }
 }
-startBot();
+
+// Delay awal 3 detik supaya instance lama sempat mati dulu
+setTimeout(() => startBot(), 3000);
 
 if (AutoAirdropCompleter) {
     autoCompleter = new AutoAirdropCompleter(bot);
