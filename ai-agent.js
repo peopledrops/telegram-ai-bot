@@ -297,7 +297,7 @@ async function processMessage(userId, userMessage, toolExecutors) {
         console.log(`🤖 AI Agent processing: "${userMessage.substring(0, 50)}..."`);
 
         const response = await groq.chat.completions.create({
-            model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile',
+            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
             messages: conversations.get(userId),
             tools: TOOLS,
             tool_choice: 'auto',
@@ -352,7 +352,7 @@ async function processMessage(userId, userMessage, toolExecutors) {
 
             // Step 3: Minta AI buat respons final berdasarkan hasil tool
             const finalResponse = await groq.chat.completions.create({
-                model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile',
+                model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
                 messages: conversations.get(userId),
                 max_tokens: 1500,
                 temperature: 0.5,
