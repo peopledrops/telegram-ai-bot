@@ -733,7 +733,96 @@ bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
 // ===== SINGLE MESSAGE HANDLER (COMBINED NL + AI FALLBACK) =====
 // ✅ HANYA ADA SATU bot.on('message') HANDLER!
 
-
+bot.on('message', async (msg) => {
+    // Skip if it's a command
+    if (msg.text?.startsWith('/')) {
+        return;
+    }
+    
+    // Skip non-text or bot messages
+    if (!msg.text || msg.from?.is_bot) return;
+    
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const messageId = msg.message_id;
+    const userMessage = msg.text.trim();  // ✅ DEFINED HERE
+    
+    // Skip very short messages
+    if (userMessage.length < 3) return;
+    
+    // Check for duplicate processing
+    if (isMessageProcessed(messageId, userId)) {
+        console.log(`⏭️ Message already processed: ${messageId}`);
+        return;
+    }
+    
+    console.log(`💬 Message from ${userId}: "${userMessage}"`);
+    
+    try {
+        await bot.sendChatAction(chatId, 'typing');
+        
+        // Try NL parser first
+        const parsed = await nlParser.parse(userMessage, userId, {
+            previousIntent: nlParser.getRecentContext(userId, 1)[0]?.intent,
+            extractedUrl: userMessage.match(/https?:\/\/[^\s]+/)?.[0]
+        });
+        
+        console.log(`🧠 Parsed: intent=${parsed.intent}, confidence=${parsed.confidence}`);
+        
+        // If confidence is high enough, use NL parser
+        if (parsed.confidence >= 0.5) {
+            nlParser.storeContext(userId, parsed.intent, parsed.entities);
+            
+            if (parsed.naturalResponse) {
+                await bot.sendMessage(chatId, parsed.naturalResponse, { parse_mode: 'Markdown' });
+            }
+            
+            msg._processed = true;
+            
+            const result = await executeParsedIntent(parsed, userId, chatId, userMessage);
+            
+            if (result) {
+                if (result.message) {
+                    await bot.sendMessage(chatId, result.message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+                }
+                
+                if (result.screenshots && Array.isArray(result.screenshots)) {
+                    for (const screenshotPath of result.screenshots) {
+                        try {
+                            if (screenshotPath) {
+                                await bot.sendPhoto(chatId, screenshotPath);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to send screenshot:', e.message);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Low confidence - fallback to AI chat
+            console.log('⚠️ Low NL confidence, using AI chat fallback');
+            const response = await ai.chat(userId, userMessage);
+            const chunks = splitMessage(response);
+            for (const chunk of chunks) {
+                await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown' });
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Message handler error:', error);
+        
+        // Fallback to AI chat on error
+        try {
+            const response = await ai.chat(userId, userMessage);
+            const chunks = splitMessage(response);
+            for (const chunk of chunks) {
+                await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown' });
+            }
+        } catch (aiError) {
+            console.error('❌ AI chat fallback also failed:', aiError.message);
+        }
+    }
+});
 
 // ===== PROFILE MANAGEMENT COMMANDS =====
 
