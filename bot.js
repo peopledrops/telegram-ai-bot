@@ -1,4 +1,4 @@
-// bot.js - Telegram Bot Handler (Fixed Complete Version)
+// bot.js - Telegram Bot Handler (FINAL FIXED VERSION)
 // ⚠️ BARIS 1: Load dotenv PALING AWAL
 require('dotenv').config();
 
@@ -8,11 +8,11 @@ const MineBeanSkill = require('./minebean');
 const airdropManager = require('./airdrop');
 const profileManager = require('./user-profiles');
 const formAutoFiller = require('./form-autofill');
-const nlParser = require('./nl-command-parser');  // ✅ MOVED TO TOP (ONLY ONCE)
+const nlParser = require('./nl-command-parser');  // ✅ DI ATAS (LINE 9)
 
 // Message deduplication store
 const processedMessages = new Map();
-const MESSAGE_TTL = 5000; // 5 seconds
+const MESSAGE_TTL = 5000;
 
 // Optional modules with fallback
 let universalScraper = null;
@@ -29,7 +29,6 @@ try {
 // ===== CONFIG & STATE =====
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
-// Initialize auto-completer AFTER bot is created
 if (AutoAirdropCompleter) {
     autoCompleter = new AutoAirdropCompleter(bot);
 }
@@ -39,7 +38,6 @@ let botInfo = null;
 
 console.log('✅ Telegram Bot initialized');
 
-// Get bot info on startup
 bot.getMe().then(me => {
     botInfo = me;
     console.log(`🤖 Bot ready: @${me.username}`);
@@ -55,19 +53,15 @@ function isMessageProcessed(messageId, userId) {
         return true;
     }
     processedMessages.set(key, Date.now());
-    
     setTimeout(() => {
         processedMessages.delete(key);
     }, MESSAGE_TTL);
-    
     return false;
 }
 
-/** Split long message into chunks (Telegram max 4096 chars) */
 function splitMessage(text, maxLength = 4000) {
     const chunks = [];
     let current = '';
-    
     for (const line of text.split('\n')) {
         if (current.length + line.length + 1 > maxLength) {
             chunks.push(current);
@@ -80,7 +74,6 @@ function splitMessage(text, maxLength = 4000) {
     return chunks;
 }
 
-/** Get or create MineBean instance for user */
 function getMineBean(userId) {
     if (!minebeanInstances.has(userId)) {
         minebeanInstances.set(userId, new MineBeanSkill(userId));
@@ -88,7 +81,6 @@ function getMineBean(userId) {
     return minebeanInstances.get(userId);
 }
 
-/** Graceful shutdown handler */
 function shutdown() {
     console.log('🛑 Shutting down...');
     bot.stopPolling();
@@ -100,7 +92,6 @@ function shutdown() {
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const name = msg.from.first_name || 'User';
-    
     const welcome = `
 👋 Halo ${name}! Selamat datang di **Groq AI Bot**!
 
@@ -126,13 +117,11 @@ bot.onText(/\/start/, async (msg) => {
 
 🎯 Mulai chat dengan mengetik apapun!
     `;
-    
     await bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
 });
 
 bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
-    
     const help = `
 📚 **BANTUAN GROQ AI BOT**
 
@@ -157,7 +146,6 @@ bot.onText(/\/help/, async (msg) => {
 📞 **Support:**
 Hubungi admin jika ada masalah.
     `;
-    
     await bot.sendMessage(chatId, help, { parse_mode: 'Markdown' });
 });
 
@@ -177,7 +165,6 @@ bot.onText(/\/stats/, async (msg) => {
 
 bot.onText(/\/about/, async (msg) => {
     const chatId = msg.chat.id;
-    
     const about = `
 🤖 **GROQ AI TELEGRAM BOT**
 
@@ -202,7 +189,6 @@ Speed: ~100-300 tokens/sec ⚡
 
 📅 Created: 2026
     `;
-    
     await bot.sendMessage(chatId, about, { parse_mode: 'Markdown' });
 });
 
@@ -212,7 +198,6 @@ bot.onText(/\/ping/, async (msg) => {
         const start = Date.now();
         const result = await ai.testConnection();
         const latency = Date.now() - start;
-        
         if (result.success) {
             await bot.sendMessage(chatId, `🏓 Pong! ${latency}ms\n✅ ${result.message}`);
         } else {
@@ -229,12 +214,10 @@ bot.onText(/\/admin/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
     const adminId = process.env.TELEGRAM_ADMIN_ID;
-    
     if (userId !== adminId) {
         await bot.sendMessage(chatId, '❌ Access denied. Admin only.');
         return;
     }
-    
     const adminMenu = `
 🔧 **ADMIN COMMANDS**
 
@@ -244,24 +227,21 @@ bot.onText(/\/admin/, async (msg) => {
 
 ⚠️ Gunakan dengan hati-hati!
     `;
-    
     await bot.sendMessage(chatId, adminMenu, { parse_mode: 'Markdown' });
 });
 
 bot.onText(/\/clearall/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
-    
     if (userId !== process.env.TELEGRAM_ADMIN_ID) {
         await bot.sendMessage(chatId, '❌ Access denied.');
         return;
     }
-    
     const response = ai.clearAllConversations();
     await bot.sendMessage(chatId, response);
 });
 
-// ===== COMMAND HANDLERS: MINEBEAN SKILL =====
+// ===== COMMAND HANDLERS: MINEBEAN =====
 
 bot.onText(/\/minebean(.*)/, async (msg, match) => {
     const chatId = msg.chat.id;
@@ -465,9 +445,8 @@ bot.onText(/\/wallet\s+(0x[a-fA-F0-9]{40})/i, async (msg, match) => {
     await bot.sendMessage(chatId, `✅ Wallet diset: \`${address}\`\n\nSekarang Anda bisa cek rewards dengan /minebean rewards\n⚠️ Pastikan ini adalah wallet yang Anda kontrol!`, { parse_mode: 'Markdown' });
 });
 
-// ===== COMMAND HANDLERS: AIRDROP LEARNING & AUTO-COMPLETION =====
+// ===== COMMAND HANDLERS: AIRDROP =====
 
-// /learn - Learn airdrop from ANY link using AI
 bot.onText(/\/learn\s+(.+)/i, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -477,14 +456,12 @@ bot.onText(/\/learn\s+(.+)/i, async (msg, match) => {
     console.log(`   URL: ${url}`);
     console.log(`   universalScraper loaded: ${!!universalScraper}`);
     
-    // Check if module is loaded
     if (!universalScraper) {
         console.log('❌ universalScraper is NULL!');
         await bot.sendMessage(chatId, '❌ **Module tidak ter-load!**\n\nCek console bot untuk detail error.', { parse_mode: 'Markdown' });
         return;
     }
     
-    // Send initial message
     await bot.sendMessage(chatId, `🔍 Mempelajari airdrop dari:\n\`${url}\`\n\n⏳ Memproses...`, { parse_mode: 'Markdown', disable_web_page_preview: true });
 
     try {
@@ -507,10 +484,7 @@ bot.onText(/\/learn\s+(.+)/i, async (msg, match) => {
             saved = { id: `temp_${Date.now()}`, ...result };
         }
         
-        // Format task list
-        const taskList = (result.tasks || []).map((t, i) => 
-            `${i + 1}. **${t.type.toUpperCase()}**: ${t.label}${t.url ? `\n   🔗 \`${t.url}\`` : ''}`
-        ).join('\n') || 'No specific tasks detected - visit page for details';
+        const taskList = (result.tasks || []).map((t, i) => `${i + 1}. **${t.type.toUpperCase()}**: ${t.label}${t.url ? `\n   🔗 \`${t.url}\`` : ''}`).join('\n') || 'No specific tasks detected - visit page for details';
         
         const message = `
 ✅ **Airdrop Berhasil Dipelajari!**
@@ -543,8 +517,6 @@ ${taskList}
     }
 });
 
-// ===== COMMAND HANDLERS: AIRDROP TASKS =====
-
 bot.onText(/\/airdrop(.*)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -555,7 +527,6 @@ bot.onText(/\/airdrop(.*)/, async (msg, match) => {
         return;
     }
     
-    // If message contains URL but no valid subcommand, skip
     if (msg.text?.includes('http') && (!subcommand || subcommand.length < 2)) {
         console.log('⏭️ /airdrop called with URL but no valid subcommand, skipping');
         return;
@@ -571,11 +542,6 @@ bot.onText(/\/airdrop(.*)/, async (msg, match) => {
 🔄 In Progress: ${summary.inProgress}
 ⏳ Not Started: ${summary.notStarted}
 📋 Total: ${summary.total}
-
-🎯 **Available Airdrops:**
-1. ⏳ **Zealy Campaign** - 🎁 500-2000 XP
-2. ⏳ **Galxe Campaign** - 🎁 NFT Badge + OAT
-3. ⏳ **LayerZero** - 🎁 $ZRO Token
 
 📋 **Commands:**
 /airdrop list - List all airdrops
@@ -651,7 +617,7 @@ bot.onText(/\/airdrop(.*)/, async (msg, match) => {
     }
 });
 
-// /autoairdrop - Full auto-completion from link
+// /autoairdrop
 bot.onText(/\/autoairdrop\s+(https?:\/\/\S+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -698,7 +664,6 @@ ${taskResults}
             
             await bot.sendMessage(chatId, report, { parse_mode: 'Markdown', disable_web_page_preview: true });
             
-            // Send screenshots if any
             if (result.status.screenshots?.length > 0) {
                 await bot.sendMessage(chatId, `📸 Sending ${result.status.screenshots.length} screenshots...`);
                 for (const screenshotPath of result.status.screenshots) {
@@ -718,14 +683,14 @@ ${taskResults}
     }
 });
 
-// /follow - Quick Twitter follow tracker
+// /follow
 bot.onText(/\/follow\s+@?(\w+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const twitterHandle = match[1];
     await bot.sendMessage(chatId, `✅ Twitter follow tracked: @${twitterHandle}\n\n🔗 Open: https://twitter.com/${twitterHandle}\n\n💡 After following, use /airdrop verify <id> twitter`, { parse_mode: 'Markdown', disable_web_page_preview: true });
 });
 
-// /join - Quick Telegram join tracker
+// /join
 bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
     const chatId = msg.chat.id;
     const tgLink = match[1];
@@ -733,7 +698,7 @@ bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
 });
 
 // ===== SINGLE MESSAGE HANDLER (COMBINED NL + AI FALLBACK) =====
-
+// ✅ HANYA ADA SATU bot.on('message') HANDLER!
 
 bot.on('message', async (msg) => {
     // Skip if it's a command
@@ -853,7 +818,6 @@ Pilih field yang ingin diset:
         return;
     }
     
-    // Parse: field value
     const parts = args.split(/\s+/);
     const field = parts[0].toLowerCase();
     const value = parts.slice(1).join(' ');
@@ -863,7 +827,6 @@ Pilih field yang ingin diset:
         return;
     }
     
-    // Validate field
     const validFields = ['twitter', 'telegram', 'discord', 'email', 'wallet', 'name'];
     if (!validFields.includes(field)) {
         await bot.sendMessage(chatId, `❌ Field tidak valid. Pilihan: ${validFields.join(', ')}`, { parse_mode: 'Markdown' });
@@ -871,7 +834,6 @@ Pilih field yang ingin diset:
     }
     
     try {
-        // Handle 'name' field (split into firstName/lastName)
         if (field === 'name') {
             const nameParts = value.split(' ');
             await profileManager.updateProfileBulk(userId, {
@@ -888,7 +850,6 @@ Pilih field yang ingin diset:
     }
 });
 
-// /myprofile - View current profile
 bot.onText(/\/myprofile/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -896,7 +857,6 @@ bot.onText(/\/myprofile/, async (msg) => {
     await bot.sendMessage(chatId, `👤 **Your Profile**\n\n${summary}\n\n✏️ Update: /setprofile`, { parse_mode: 'Markdown' });
 });
 
-// /clearprofile - Clear user profile
 bot.onText(/\/clearprofile/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -910,7 +870,6 @@ bot.onText(/\/clearprofile/, async (msg) => {
     }
 });
 
-// /autofill - Auto-fill and submit form
 bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -918,7 +877,6 @@ bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
     
     console.log(`🔍 /autofill command: user=${userId}, url=${url}`);
     
-    // Check if module is loaded correctly
     if (!formAutoFiller || typeof formAutoFiller.autoSubmitForm !== 'function') {
         console.error('❌ formAutoFiller module not loaded correctly');
         console.error('   formAutoFiller:', formAutoFiller);
@@ -927,7 +885,6 @@ bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
         return;
     }
     
-    // Check profile
     const profile = profileManager.getProfile(userId);
     if (!profile) {
         await bot.sendMessage(chatId, '❌ **Profile belum diset!**\n\nGunakan /setprofile untuk menambahkan data sosial media Anda.', { parse_mode: 'Markdown' });
@@ -943,7 +900,6 @@ bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
         const result = await formAutoFiller.autoSubmitForm(url, userId);
         console.log('✅ autoSubmitForm completed:', result.success ? 'success' : 'failed');
         
-        // Save screenshots
         const screenshotPaths = [];
         if (result.screenshots) {
             if (result.screenshots.before) {
@@ -960,7 +916,6 @@ bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
             }
         }
         
-        // Format result message
         const filledFieldsList = (result.filledFields || []).map(f => `✅ ${f.field}: \`${f.value}\``).join('\n') || '❌ No fields filled';
         const statusIcon = result.success ? '✅' : '⚠️';
         const statusText = result.success ? 'Form Submitted!' : 'Submit Failed - may need manual completion';
@@ -986,7 +941,6 @@ ${result.error ? `❌ Error: ${result.error}` : ''}
         
         await bot.sendMessage(chatId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
         
-        // Send screenshots
         for (const screenshotPath of screenshotPaths) {
             try {
                 await bot.sendPhoto(chatId, screenshotPath);
@@ -1001,7 +955,6 @@ ${result.error ? `❌ Error: ${result.error}` : ''}
         console.error('Stack:', error.stack);
         await bot.sendMessage(chatId, `❌ **Auto-Fill Failed**\n\nError: ${error.message}\n\n💡 Coba manual atau hubungi admin.`, { parse_mode: 'Markdown' });
     } finally {
-        // Close browser if still open
         if (!browserClosed && formAutoFiller && typeof formAutoFiller.closeBrowser === 'function') {
             try {
                 await formAutoFiller.closeBrowser();
@@ -1013,13 +966,11 @@ ${result.error ? `❌ Error: ${result.error}` : ''}
     }
 });
 
-// /quickfill - Quick fill for common airdrops
 bot.onText(/\/quickfill\s+(\w+)/i, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
     const airdropName = match[1].toLowerCase();
     
-    // Predefined airdrop URLs
     const airdrops = {
         'probechain': 'https://probechain.org/airdrop/',
         'zealy': 'https://zealy.io',
@@ -1032,7 +983,6 @@ bot.onText(/\/quickfill\s+(\w+)/i, async (msg, match) => {
         return;
     }
     
-    // Redirect to /autofill
     msg.text = `/autofill ${url}`;
     bot.emit('message', msg);
 });
@@ -1042,7 +992,6 @@ bot.onText(/\/quickfill\s+(\w+)/i, async (msg, match) => {
 async function executeParsedIntent(parsed, userId, chatId, originalMessage) {
     console.log(`⚡ Executing intent: ${parsed.intent}`);
     
-    // Execute chained intent first
     if (parsed.chainBefore) {
         console.log(`🔗 Executing chained intent first: ${parsed.chainBefore.intent}`);
         await executeParsedIntent(parsed.chainBefore, userId, chatId, originalMessage);
@@ -1055,21 +1004,17 @@ async function executeParsedIntent(parsed, userId, chatId, originalMessage) {
                 return { message: '❌ Saya tidak menemukan URL airdrop. Kirim link airdrop yang ingin dikerjakan.' };
             }
             
-            // Check profile
             const profile = profileManager.getProfile(userId);
             if (!profile) {
                 return { message: '❌ Profile belum diset. Gunakan /setprofile dulu.' };
             }
             
-            // Merge profile with entities
             const effectiveProfile = { ...profile, ...parsed.entities };
             
-            // Execute autofill
             if (formAutoFiller && typeof formAutoFiller.autoSubmitForm === 'function') {
                 try {
                     const result = await formAutoFiller.autoSubmitForm(url, userId);
                     
-                    // Safely handle screenshots
                     const screenshots = [];
                     if (result?.screenshots?.before) {
                         try {
@@ -1106,7 +1051,6 @@ ${filledList}
                     return { message: `❌ Auto-fill error: ${error.message}\n\n💡 Coba manual atau hubungi admin.` };
                 }
             } else {
-                // Fallback manual
                 return {
                     message: `
 📋 **Data untuk Manual Fill**
