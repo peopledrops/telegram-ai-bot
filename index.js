@@ -13,13 +13,19 @@ const missing = required.filter(key => !process.env[key]);
 if (missing.length > 0) {
     console.error('❌ Missing environment variables:');
     missing.forEach(key => console.error(`   - ${key}`));
-    console.error('\n📝 Check your .env file!');
+    console.error('\n📝 Check your .env file or Railway Variables!');
     process.exit(1);
 }
 
 console.log('✅ Environment loaded');
-console.log(`🔑 GROQ_API_KEY: ${process.env.GROQ_API_KEY.substring(0, 10)}...`);
-console.log(`📱 TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN.substring(0, 20)}...`);
+
+// 🔍 Debug: Show which env vars are actually loaded
+console.log('🔍 Debug env vars:');
+console.log('   GROQ_API_KEY:', process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing');
+console.log('   TELEGRAM_BOT_TOKEN:', process.env.TELEGRAM_BOT_TOKEN ? '✅ Set' : '❌ Missing');
+console.log('   MINEBEAN_API:', process.env.MINEBEAN_API ? '✅ Set' : '❌ Missing');
+console.log('   BASE_RPC:', process.env.BASE_RPC ? '✅ Set' : '❌ Missing');
+console.log('   TELEGRAM_ADMIN_ID:', process.env.TELEGRAM_ADMIN_ID ? '✅ Set' : '❌ Missing');
 
 // Test Groq connection
 async function testGroq() {
@@ -27,7 +33,7 @@ async function testGroq() {
         const { OpenAI } = require('openai');
         const groq = new OpenAI({
             apiKey: process.env.GROQ_API_KEY,
-            baseURL: 'https://api.groq.com/openai/v1',
+            baseURL: 'https://api.groq.com/openai/v1',  // ✅ FIXED: No trailing spaces!
         });
         
         console.log('🧪 Testing Groq API...');
@@ -58,7 +64,7 @@ async function start() {
     const groqOk = await testGroq();
     if (!groqOk) {
         console.error('\n⚠️  Groq connection failed. Bot may not work.');
-        console.error('   Check GROQ_API_KEY in .env\n');
+        console.error('   Check GROQ_API_KEY in Railway Variables\n');
     }
     
     console.log('\n🚀 Starting Telegram Bot...\n');
