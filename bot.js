@@ -208,7 +208,6 @@ Speed: ~100-300 tokens/sec ⚡
 
 bot.onText(/\/ping/, async (msg) => {
     const chatId = msg.chat.id;
-    
     try {
         const start = Date.now();
         const result = await ai.testConnection();
@@ -487,7 +486,7 @@ bot.onText(/\/learn\s+(.+)/i, async (msg, match) => {
     
     // Send initial message
     await bot.sendMessage(chatId, `🔍 Mempelajari airdrop dari:\n\`${url}\`\n\n⏳ Memproses...`, { parse_mode: 'Markdown', disable_web_page_preview: true });
-    
+
     try {
         console.log(`🕷️ Calling scraper.learnFromLink(${url})...`);
         const result = await universalScraper.learnFromLink(url, { useAI: false });
@@ -509,7 +508,9 @@ bot.onText(/\/learn\s+(.+)/i, async (msg, match) => {
         }
         
         // Format task list
-        const taskList = (result.tasks || []).map((t, i) => `${i + 1}. **${t.type.toUpperCase()}**: ${t.label}${t.url ? `\n   🔗 \`${t.url}\`` : ''}`).join('\n') || 'No specific tasks detected - visit page for details';
+        const taskList = (result.tasks || []).map((t, i) => 
+            `${i + 1}. **${t.type.toUpperCase()}**: ${t.label}${t.url ? `\n   🔗 \`${t.url}\`` : ''}`
+        ).join('\n') || 'No specific tasks detected - visit page for details';
         
         const message = `
 ✅ **Airdrop Berhasil Dipelajari!**
@@ -697,6 +698,7 @@ ${taskResults}
             
             await bot.sendMessage(chatId, report, { parse_mode: 'Markdown', disable_web_page_preview: true });
             
+            // Send screenshots if any
             if (result.status.screenshots?.length > 0) {
                 await bot.sendMessage(chatId, `📸 Sending ${result.status.screenshots.length} screenshots...`);
                 for (const screenshotPath of result.status.screenshots) {
