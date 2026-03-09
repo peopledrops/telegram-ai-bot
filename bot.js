@@ -733,7 +733,7 @@ bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
 });
 
 // ===== SINGLE MESSAGE HANDLER (COMBINED NL + AI FALLBACK) =====
-// ✅ HANYA ADA SATU bot.on('message') HANDLER!
+
 
 bot.on('message', async (msg) => {
     // Skip if it's a command
