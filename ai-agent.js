@@ -169,6 +169,73 @@ const TOOLS = [
             description: 'Reset/hapus riwayat percakapan dan mulai baru',
             parameters: { type: 'object', properties: {}, required: [] }
         }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'check_wallet_balance',
+            description: 'Cek saldo ETH/BNB wallet di semua chain atau chain tertentu',
+            parameters: {
+                type: 'object',
+                properties: {
+                    chain: {
+                        type: 'string',
+                        enum: ['ethereum', 'base', 'arbitrum', 'bnb'],
+                        description: 'Chain yang ingin dicek, kosongkan untuk cek semua'
+                    }
+                },
+                required: []
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'claim_airdrop_onchain',
+            description: 'Claim airdrop langsung dari smart contract on-chain',
+            parameters: {
+                type: 'object',
+                properties: {
+                    chain: {
+                        type: 'string',
+                        enum: ['ethereum', 'base', 'arbitrum', 'bnb'],
+                        description: 'Chain tempat contract berada'
+                    },
+                    contract_address: {
+                        type: 'string',
+                        description: 'Alamat smart contract airdrop (0x...)'
+                    },
+                    value: {
+                        type: 'string',
+                        description: 'ETH/BNB yang perlu dikirim saat claim (biasanya 0)'
+                    }
+                },
+                required: ['chain', 'contract_address']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'sign_message',
+            description: 'Sign pesan dengan wallet untuk verifikasi identitas di airdrop',
+            parameters: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string', description: 'Pesan yang akan di-sign' },
+                    chain: { type: 'string', description: 'Chain yang dipakai' }
+                },
+                required: ['message']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_wallet_info',
+            description: 'Tampilkan info wallet yang sedang aktif (address, chain)',
+            parameters: { type: 'object', properties: {}, required: [] }
+        }
     }
 ];
 
@@ -179,10 +246,13 @@ PENTING - CARA KERJA KAMU:
 - Saat user minta sesuatu, LANGSUNG jalankan tool yang sesuai - JANGAN minta user untuk melakukan manual
 - Kamu TIDAK perlu izin untuk menjalankan tool - langsung eksekusi saja
 - Jika user bilang "cek harga" → langsung panggil check_bean_price
-- Jika user bilang "lihat reward" → langsung panggil check_rewards  
+- Jika user bilang "lihat reward" → langsung panggil check_rewards
+- Jika user bilang "cek balance" atau "saldo" → langsung panggil check_wallet_balance
+- Jika user bilang "claim" + contract address → langsung panggil claim_airdrop_onchain
 - Jika user kirim link airdrop → langsung panggil learn_airdrop_from_url atau autofill_airdrop_form
 - Jika user minta suggest block → langsung panggil suggest_blocks
 - Jika ada URL di pesan → otomatis proses URL tersebut
+- Jika ada contract address (0x... 40 karakter) → tanya chain lalu claim
 
 PRINSIP UTAMA:
 - SELALU eksekusi tool dulu, baru jelaskan hasilnya
@@ -191,6 +261,11 @@ PRINSIP UTAMA:
 - Jawab dalam Bahasa Indonesia yang santai dan friendly
 - Gunakan emoji yang relevan
 - Jika tidak yakin mau pakai tool apa, pilih yang paling relevan dan eksekusi
+
+KEAMANAN WALLET:
+- Jangan pernah minta atau tampilkan private key user
+- Ingatkan user untuk pakai wallet khusus bot, bukan wallet utama
+- Selalu tampilkan hash transaksi dan link explorer setelah claim
 
 Kamu adalah asisten yang BERTINDAK, bukan yang hanya menjelaskan.`;
 

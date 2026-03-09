@@ -3,8 +3,9 @@
 require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
-const aiAgent = require('./ai-agent');   // ✅ AI Agent baru (gantikan ai.js untuk chat)
-const ai = require('./ai');              // ✅ Tetap dipakai untuk /reset, /stats, /ping
+const aiAgent = require('./ai-agent');          // ✅ AI Agent - satu-satunya AI module
+const walletManager = require('./web3-wallet'); // ✅ Web3 wallet manager
+const { registerWalletCommands } = require('./wallet-commands'); // ✅ Wallet commands
 const MineBeanSkill = require('./minebean');
 const airdropManager = require('./airdrop');
 const profileManager = require('./user-profiles');
@@ -48,6 +49,9 @@ bot.getMe().then(me => {
 }).catch(err => {
     console.error('❌ Failed to get bot info:', err.message);
 });
+
+// ✅ Register wallet commands
+registerWalletCommands(bot);
 
 // ===== HELPER FUNCTIONS =====
 
@@ -226,7 +230,52 @@ function createToolExecutors(userId, chatId) {
         async reset_conversation() {
             aiAgent.resetConversation(userId);
             return 'Percakapan direset!';
-        }
+        },
+
+        // ===== WALLET / WEB3 TOOLS =====
+        async check_wallet_balance({ chain } = {}) {
+            const info = walletManager.walletInfo(userId);
+            if (!info.hasWallet) return 'Wallet belum diset. Kirim /setwallet lalu private key kamu (di chat private ya!).';
+            if (chain) {
+                const bal = await walletManager.getBalance(userId, chain);
+                return `Balance ${bal.chain}: ${bal.balance} ${bal.symbol} | Address: ${bal.address} | Explorer: ${bal.explorer}`;
+            } else {
+                const balances = await walletManager.getAllBalances(userId);
+                return balances.map(b =>
+                    b.error ? `${b.chain}: Error` : `${b.chain}: ${b.balance} ${b.symbol}`
+                ).join('\n');
+            }
+        },
+
+        async claim_airdrop_onchain({ chain, contract_address, value = '0' } = {}) {
+            const info = walletManager.walletInfo(userId);
+            if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet terlebih dahulu.';
+            if (!contract_address) return 'Contract address diperlukan.';
+
+            await bot.sendMessage(chatId, `⏳ Mencoba claim on-chain...\n⛓️ ${chain}\n📜 \`${contract_address}\`\n👛 \`${info.address}\``, { parse_mode: 'Markdown' }).catch(() => {});
+
+            const result = await walletManager.claimAirdrop(userId, chain, contract_address, {
+                address: info.address, value
+            });
+
+            return result.success
+                ? `Claim berhasil! Method: ${result.method} | Tx: ${result.hash} | Explorer: ${result.explorer}`
+                : `Claim gagal. Gas: ${result.gasUsed}`;
+        },
+
+        async sign_message({ message, chain = 'base' } = {}) {
+            const info = walletManager.walletInfo(userId);
+            if (!info.hasWallet) return 'Wallet belum diset.';
+            if (!message) return 'Pesan untuk di-sign diperlukan.';
+            const result = await walletManager.signMessage(userId, message, chain);
+            return `Signed!\nAddress: ${result.address}\nSignature: ${result.signature}`;
+        },
+
+        async get_wallet_info() {
+            const info = walletManager.walletInfo(userId);
+            if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet di chat private.';
+            return `Wallet aktif:\nAddress: ${info.address}\nChain: ${info.chain}\nSource: ${info.source}`;
+        },
     };
 }
 
@@ -289,7 +338,6 @@ bot.onText(/\/reset/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
     aiAgent.resetConversation(userId);
-    ai.resetConversation(userId);
     await bot.sendMessage(chatId, '🔄 Percakapan direset! Halo lagi! 👋');
 });
 
@@ -352,7 +400,6 @@ bot.onText(/\/clearall/, async (msg) => {
         return;
     }
     aiAgent.clearAllConversations();
-    ai.clearAllConversations();
     await bot.sendMessage(chatId, '✅ Semua conversation dihapus.');
 });
 
