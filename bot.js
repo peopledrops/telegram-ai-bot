@@ -38,7 +38,29 @@ try {
 }
 
 // ===== CONFIG & STATE =====
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+    polling: {
+        interval: 300,
+        autoStart: false,   // ✅ Jangan auto-start, kita start manual setelah clear webhook
+        params: { timeout: 10 }
+    }
+});
+
+// ✅ Clear webhook & pastikan tidak ada instance lain sebelum start polling
+async function startBot() {
+    try {
+        console.log('🔄 Clearing webhook & previous sessions...');
+        await bot.deleteWebHook({ drop_pending_updates: true });
+        await new Promise(r => setTimeout(r, 2000)); // tunggu 2 detik
+        await bot.startPolling();
+        console.log('✅ Bot polling started successfully');
+    } catch (err) {
+        console.error('❌ Failed to start polling:', err.message);
+        // Coba lagi setelah 5 detik
+        setTimeout(startBot, 5000);
+    }
+}
+startBot();
 
 if (AutoAirdropCompleter) {
     autoCompleter = new AutoAirdropCompleter(bot);
@@ -892,7 +914,25 @@ bot.on('message', async (msg) => {
 
 // ===== ERROR HANDLERS =====
 
-bot.on('polling_error', (error) => console.error('❌ Polling Error:', error.message));
+bot.on('polling_error', async (error) => {
+    console.error('❌ Polling Error:', error.message);
+
+    if (error.message?.includes('409')) {
+        // Conflict: ada instance lain - stop & restart
+        console.log('⚠️ Conflict detected, restarting in 5s...');
+        try {
+            await bot.stopPolling();
+            await new Promise(r => setTimeout(r, 5000));
+            await bot.deleteWebHook({ drop_pending_updates: true });
+            await new Promise(r => setTimeout(r, 2000));
+            await bot.startPolling();
+            console.log('✅ Polling restarted after conflict');
+        } catch (e) {
+            console.error('❌ Restart failed:', e.message);
+            setTimeout(startBot, 5000);
+        }
+    }
+});
 bot.on('error', (error) => console.error('❌ Bot Error:', error.message));
 
 process.on('unhandledRejection', (reason) => console.error('❌ Unhandled Rejection:', reason));
