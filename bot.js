@@ -337,11 +337,18 @@ Chain: Base (8453) | Round: 60 detik
                 break;
             }
             case 'ev': {
+                // ✅ FIX: was using undefined `deployedEth`, now correctly uses `deployEth`
                 const deployEth = args[1] || '0.001';
                 const roundData = await mb.getCurrentRound();
                 const priceData = await mb.getBeanPrice();
                 if (!roundData || !priceData) { await bot.sendMessage(chatId, '❌ Gagal ambil data untuk kalkulasi EV'); return; }
-                const ev = mb.calculateEV({ deployedEth, beanPriceEth: priceData.priceNative || '0.000015', beanpotPool: roundData.beanpotPoolFormatted || '0', totalDeployed: roundData.totalDeployedFormatted || '1', yourShareOnWinningBlock: 0.04 });
+                const ev = mb.calculateEV({
+                    deployedEth: deployEth,  // ✅ FIX: was `deployedEth` (undefined var), now `deployEth`
+                    beanPriceEth: priceData.priceNative || '0.000015',
+                    beanpotPool: roundData.beanpotPoolFormatted || '0',
+                    totalDeployed: roundData.totalDeployedFormatted || '1',
+                    yourShareOnWinningBlock: 0.04
+                });
                 const evMsg = `
 📊 **Expected Value Analysis**
 
@@ -697,10 +704,6 @@ bot.onText(/\/join\s+(https?:\/\/t\.me\/\w+)/i, async (msg, match) => {
     await bot.sendMessage(chatId, `✅ Telegram join tracked\n\n🔗 Join: ${tgLink}\n\n💡 After joining, use /airdrop verify <id> telegram`, { parse_mode: 'Markdown', disable_web_page_preview: true });
 });
 
-// ===== SINGLE MESSAGE HANDLER (COMBINED NL + AI FALLBACK) =====
-// ✅ HANYA ADA SATU bot.on('message') HANDLER!
-
-
 // ===== PROFILE MANAGEMENT COMMANDS =====
 
 bot.onText(/\/setprofile(?:\s+(.+))?/, async (msg, match) => {
@@ -789,8 +792,6 @@ bot.onText(/\/autofill\s+(https?:\/\/\S+)/, async (msg, match) => {
     
     if (!formAutoFiller || typeof formAutoFiller.autoSubmitForm !== 'function') {
         console.error('❌ formAutoFiller module not loaded correctly');
-        console.error('   formAutoFiller:', formAutoFiller);
-        console.error('   typeof autoSubmitForm:', typeof formAutoFiller?.autoSubmitForm);
         await bot.sendMessage(chatId, '❌ **Auto-fill module error**\n\nModule tidak ter-load dengan benar. Hubungi admin.', { parse_mode: 'Markdown' });
         return;
     }
@@ -1011,6 +1012,92 @@ ${effectiveProfile.wallet ? `💰 Wallet: ${effectiveProfile.wallet}` : ''}
             return null;
     }
 }
+
+// ===== SINGLE MESSAGE HANDLER (COMBINED NL + AI FALLBACK) =====
+// ✅ SATU-SATUNYA bot.on('message') HANDLER
+
+bot.on('message', async (msg) => {
+    // Skip jika bukan pesan teks
+    if (!msg.text) return;
+
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const userMessage = msg.text.trim(); // ✅ FIX: definisikan userMessage di sini
+
+    // Deduplication check
+    if (isMessageProcessed(msg.message_id, userId)) {
+        console.log(`⏭️ Duplicate message skipped: ${msg.message_id}`);
+        return;
+    }
+
+    // Skip semua perintah (dihandle oleh onText di atas)
+    if (userMessage.startsWith('/')) return;
+
+    console.log(`💬 Message from ${msg.from.username || userId}: ${userMessage.substring(0, 50)}...`);
+
+    try {
+        // ===== STEP 1: Coba NL Parser dulu =====
+        let parsed = null;
+        try {
+            if (nlParser && typeof nlParser.parse === 'function') {
+                parsed = nlParser.parse(userMessage, userId);
+            }
+        } catch (nlError) {
+            console.warn('⚠️ NL Parser error (non-critical):', nlError.message);
+        }
+
+        if (parsed && parsed.intent && parsed.intent !== 'unknown' && parsed.handler) {
+            console.log(`🎯 NL intent detected: ${parsed.intent}`);
+
+            // Kirim typing indicator
+            try { await bot.sendChatAction(chatId, 'typing'); } catch (e) {}
+
+            const intentResult = await executeParsedIntent(parsed, userId, chatId, userMessage);
+
+            if (intentResult) {
+                const chunks = splitMessage(intentResult.message || '✅ Done');
+                for (const chunk of chunks) {
+                    await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown', disable_web_page_preview: true });
+                }
+
+                // Kirim screenshots jika ada
+                if (intentResult.screenshots?.length > 0) {
+                    for (const screenshotPath of intentResult.screenshots) {
+                        try {
+                            await bot.sendPhoto(chatId, screenshotPath);
+                        } catch (e) {
+                            console.error('Failed to send screenshot:', e.message);
+                        }
+                    }
+                }
+                return;
+            }
+        }
+
+        // ===== STEP 2: Fallback ke AI =====
+        console.log(`🤖 Falling back to AI for: ${userMessage.substring(0, 30)}...`);
+        try { await bot.sendChatAction(chatId, 'typing'); } catch (e) {}
+
+        const aiResponse = await ai.chat(userId, userMessage);
+
+        if (aiResponse) {
+            const chunks = splitMessage(aiResponse);
+            for (const chunk of chunks) {
+                await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown' });
+            }
+        } else {
+            await bot.sendMessage(chatId, '❌ Maaf, tidak ada respon dari AI. Coba lagi.');
+        }
+
+    } catch (error) {
+        console.error('❌ Message handler error:', error);
+        try {
+            await bot.sendMessage(chatId, `❌ Terjadi kesalahan: ${error.message}\n\nCoba lagi atau ketik /reset`);
+        } catch (sendError) {
+            console.error('❌ Failed to send error message:', sendError.message);
+        }
+    }
+});
 
 // ===== ERROR HANDLERS =====
 
