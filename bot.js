@@ -294,7 +294,8 @@ function createToolExecutors(userId, chatId) {
         },
 
         // ===== WALLET / WEB3 TOOLS =====
-        async check_wallet_balance({ chain } = {}) {
+        async check_wallet_balance(args = {}) {
+            const { chain } = (args && typeof args === 'object') ? args : {};
             if (!walletManager) return 'Web3 module belum terinstall. Jalankan: npm install ethers';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset. Kirim /setwallet lalu private key kamu (di chat private ya!).';
@@ -309,7 +310,8 @@ function createToolExecutors(userId, chatId) {
             }
         },
 
-        async claim_airdrop_onchain({ chain, contract_address, value = '0' } = {}) {
+        async claim_airdrop_onchain(args = {}) {
+            const { chain, contract_address, value = '0' } = (args && typeof args === 'object') ? args : {};
             if (!walletManager) return 'Web3 module belum terinstall. Jalankan: npm install ethers';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet terlebih dahulu.';
@@ -326,7 +328,8 @@ function createToolExecutors(userId, chatId) {
                 : `Claim gagal. Gas: ${result.gasUsed}`;
         },
 
-        async sign_message({ message, chain = 'base' } = {}) {
+        async sign_message(args = {}) {
+            const { message, chain = 'base' } = (args && typeof args === 'object') ? args : {};
             if (!walletManager) return 'Web3 module belum terinstall.';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset.';

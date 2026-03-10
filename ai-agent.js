@@ -267,6 +267,10 @@ KEAMANAN WALLET:
 - Ingatkan user untuk pakai wallet khusus bot, bukan wallet utama
 - Selalu tampilkan hash transaksi dan link explorer setelah claim
 
+PENTING - JANGAN panggil wallet/balance tools kalau user hanya sapa (Hai, Hello, Halo, dll).
+Hanya panggil check_wallet_balance jika user EKSPLISIT minta cek saldo/balance.
+Hanya panggil claim_airdrop_onchain jika user EKSPLISIT minta claim dengan contract address.
+
 Kamu adalah asisten yang BERTINDAK, bukan yang hanya menjelaskan.`;
 
 // ===== CONVERSATION HISTORY =====
