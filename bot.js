@@ -5,6 +5,17 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const aiAgent = require('./ai-agent');          // ✅ AI Agent - satu-satunya AI module
 
+// Browser Use Cloud - optional (butuh: BROWSER_USE_API_KEY di env)
+let browserUseClient = null;
+try {
+    const bu = require('./browser-use');
+    browserUseClient = bu.getClient();
+    if (browserUseClient) console.log('✅ Browser Use Cloud module loaded');
+    else console.log('⚠️ Browser Use Cloud: BROWSER_USE_API_KEY tidak diset');
+} catch (e) {
+    console.log('⚠️ Browser Use module not loaded:', e.message);
+}
+
 // Web3 wallet - optional (butuh: npm install ethers)
 let walletManager = null;
 let registerWalletCommands = null;
@@ -233,13 +244,51 @@ function createToolExecutors(userId, chatId) {
 
         async autofill_airdrop_form({ url } = {}) {
             if (!url) return 'URL tidak ditemukan';
-            if (!formAutoFiller) return 'Module auto-fill tidak tersedia';
 
             const profile = profileManager.getProfile(userId);
             if (!profile) return 'Profile belum diset. Kirim: set twitter @usernamesaya dulu!';
 
-            await bot.sendMessage(chatId, `🤖 Mengisi form airdrop... ⏳ (30-60 detik)`, { disable_web_page_preview: true }).catch(() => {});
+            // ✅ Prioritas 1: Browser Use Cloud (lebih handal, tidak butuh Chromium)
+            if (browserUseClient) {
+                await bot.sendMessage(chatId,
+                    `🌐 *Mengisi form via Browser Use Cloud...*
+🔗 ${url}
 
+⏳ Mohon tunggu 1-2 menit...`,
+                    { parse_mode: 'Markdown', disable_web_page_preview: true }
+                ).catch(() => {});
+
+                const result = await browserUseClient.autoFillAndWait(url, profile, { timeoutMs: 150000 });
+
+                // Kirim live preview URL dulu
+                if (result.liveUrl) {
+                    await bot.sendMessage(chatId,
+                        `👁️ *Live Preview:*
+${result.liveUrl}
+
+_Klik untuk lihat browser bekerja secara real-time_`,
+                        { parse_mode: 'Markdown', disable_web_page_preview: false }
+                    ).catch(() => {});
+                }
+
+                if (result.success) {
+                    const output = result.output ? `
+
+📋 Hasil: ${result.output}` : '';
+                    return `✅ Form berhasil diisi & disubmit via Browser Use Cloud!${output}`;
+                } else {
+                    return `⚠️ Browser Use selesai tapi mungkin perlu cek manual: ${result.error || 'unknown'}`;
+                }
+            }
+
+            // Fallback: Puppeteer lokal
+            if (!formAutoFiller) {
+                return '❌ Tidak ada browser module tersedia.
+
+Set BROWSER_USE_API_KEY di Railway Variables untuk menggunakan Browser Use Cloud.';
+            }
+
+            await bot.sendMessage(chatId, `🤖 Mengisi form airdrop... ⏳ (30-60 detik)`, { disable_web_page_preview: true }).catch(() => {});
             const result = await formAutoFiller.autoSubmitForm(url, userId);
 
             if (result.screenshots?.final) {
