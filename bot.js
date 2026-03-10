@@ -25,7 +25,7 @@ try {
     registerWalletCommands = wc.registerWalletCommands;
     console.log('✅ Web3 wallet module loaded');
 } catch (e) {
-    console.log('⚠️ Web3 wallet module not loaded:', e.message);
+    console.log('⚠️ Web3 wallet (opsional) tidak loaded:', e.message);
     console.log('   Jalankan: npm install ethers');
 }
 const MineBeanSkill = require('./minebean');
@@ -118,10 +118,10 @@ if (registerWalletCommands) {
 } else {
     // Fallback handler jika ethers belum install
     bot.onText(/\/setwallet(.*)/, async (msg) => {
-        await bot.sendMessage(msg.chat.id, '❌ Web3 module belum terinstall.\n\nJalankan di server:\n`npm install ethers`\n\nLalu redeploy.', { parse_mode: 'Markdown' });
+        await bot.sendMessage(msg.chat.id, '❌ Fitur wallet Web3 belum aktif.\n\nJalankan di server:\n`npm install ethers`\n\nLalu redeploy.', { parse_mode: 'Markdown' });
     });
     bot.onText(/\/balance(.*)/, async (msg) => {
-        await bot.sendMessage(msg.chat.id, '❌ Web3 module belum terinstall.\n\nJalankan: `npm install ethers`', { parse_mode: 'Markdown' });
+        await bot.sendMessage(msg.chat.id, '❌ Fitur wallet Web3 belum aktif.\n\nJalankan: `npm install ethers`', { parse_mode: 'Markdown' });
     });
 }
 
@@ -343,7 +343,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
         // ===== WALLET / WEB3 TOOLS =====
         async check_wallet_balance(args = {}) {
             const { chain } = (args && typeof args === 'object') ? args : {};
-            if (!walletManager) return 'Web3 module belum terinstall. Jalankan: npm install ethers';
+            if (!walletManager) return 'Fitur wallet Web3 belum aktif. Hubungi admin untuk install ethers di server.';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset. Kirim /setwallet lalu private key kamu (di chat private ya!).';
             if (chain) {
@@ -359,7 +359,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
 
         async claim_airdrop_onchain(args = {}) {
             const { chain, contract_address, value = '0' } = (args && typeof args === 'object') ? args : {};
-            if (!walletManager) return 'Web3 module belum terinstall. Jalankan: npm install ethers';
+            if (!walletManager) return 'Fitur wallet Web3 belum aktif. Hubungi admin untuk install ethers di server.';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet terlebih dahulu.';
             if (!contract_address) return 'Contract address diperlukan.';
@@ -377,7 +377,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
 
         async sign_message(args = {}) {
             const { message, chain = 'base' } = (args && typeof args === 'object') ? args : {};
-            if (!walletManager) return 'Web3 module belum terinstall.';
+            if (!walletManager) return 'Fitur wallet Web3 belum aktif.';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset.';
             if (!message) return 'Pesan untuk di-sign diperlukan.';
@@ -386,7 +386,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
         },
 
         async get_wallet_info() {
-            if (!walletManager) return 'Web3 module belum terinstall.';
+            if (!walletManager) return 'Fitur wallet Web3 belum aktif.';
             const info = walletManager.walletInfo(userId);
             if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet di chat private.';
             return `Wallet aktif:\nAddress: ${info.address}\nChain: ${info.chain}\nSource: ${info.source}`;
