@@ -283,9 +283,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
 
             // Fallback: Puppeteer lokal
             if (!formAutoFiller) {
-                return '❌ Tidak ada browser module tersedia.
-
-Set BROWSER_USE_API_KEY di Railway Variables untuk menggunakan Browser Use Cloud.';
+                return '❌ Tidak ada browser module tersedia.\n\nSet BROWSER_USE_API_KEY di Railway Variables untuk menggunakan Browser Use Cloud.';
             }
 
             await bot.sendMessage(chatId, `🤖 Mengisi form airdrop... ⏳ (30-60 detik)`, { disable_web_page_preview: true }).catch(() => {});
