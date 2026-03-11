@@ -1,8 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
 [phases.install]
-cmds = ["npm install --legacy-peer-deps"]
+cmds = [
+  "npm install -g pnpm",
+  "node lobmoney-setup.js"
+]
 
 [phases.build]
 cmds = []
 
 [start]
-cmd = "node index.js"
+cmd = "node lobmoney-runner.js"
