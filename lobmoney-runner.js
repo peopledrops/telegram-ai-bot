@@ -46,13 +46,20 @@ async function setup() {
     console.log(`💰 Balance: ${info.data.balance} LOBCOIN`);
     console.log(`⛏️ Gold this epoch: ${info.data.gold_balance}`);
 
-    // Clone repo kalau belum ada
+    // Download repo via zip (tidak butuh git)
     if (!fs.existsSync(WORK_DIR)) {
-        console.log('📥 Cloning gameplay repo...');
-        execSync(`git clone ${REPO_URL} ${WORK_DIR}`, { stdio: 'inherit' });
+        console.log('📥 Downloading gameplay repo...');
+        const zipUrl = 'https://github.com/fungame2026/gameplay/archive/refs/heads/main.zip';
+        const zipPath = '/tmp/gameplay.zip';
+
+        // Download zip
+        execSync(`wget -O ${zipPath} "${zipUrl}" || curl -L -o ${zipPath} "${zipUrl}"`, { stdio: 'inherit' });
+
+        // Extract
+        execSync(`mkdir -p ${WORK_DIR} && unzip -o ${zipPath} -d /tmp/gameplay_extract && mv /tmp/gameplay_extract/gameplay-main/* ${WORK_DIR}/`, { stdio: 'inherit' });
+        console.log('✅ Repo downloaded and extracted');
     } else {
-        console.log('📥 Pulling latest gameplay repo...');
-        execSync(`git -C ${WORK_DIR} pull`, { stdio: 'inherit' });
+        console.log('📁 Gameplay repo already exists, skipping download');
     }
 
     // Install dependencies
