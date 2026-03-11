@@ -227,19 +227,67 @@ function createToolExecutors(userId, chatId) {
 
         async learn_airdrop_from_url({ url } = {}) {
             if (!url) return 'URL tidak ditemukan';
-            if (!universalScraper) return 'Module scraper tidak tersedia';
 
-            await bot.sendMessage(chatId, `🔍 Mempelajari airdrop dari ${url}... ⏳`, { disable_web_page_preview: true }).catch(() => {});
+            await bot.sendMessage(chatId, `🔍 Mengakses & menganalisis link... ⏳
+${url}`, { disable_web_page_preview: true }).catch(() => {});
 
-            const result = await universalScraper.learnFromLink(url, { useAI: false });
-            if (!result.success) return `Gagal: ${result.error}`;
+            // Prioritas 1: Browser Use Cloud (bisa render JS, login, dll)
+            if (browserUseClient) {
+                const task = `Go to this URL: ${url}
+Analyze this page and provide a detailed summary in Indonesian including:
+1. What is this website/project about?
+2. Is this an airdrop? If yes, what are the requirements and rewards?
+3. What tasks need to be completed?
+4. Are there any forms to fill out?
+5. Key information the user should know
 
-            let saved;
-            try { saved = await universalScraper.saveAirdrop(result); }
-            catch (e) { saved = { id: `temp_${Date.now()}`, ...result }; }
+Be specific and detailed. Respond in Indonesian.`;
 
-            const tasks = (result.tasks||[]).map((t, i) => `${i+1}. ${t.type}: ${t.label}`).join(', ') || 'tidak ada task spesifik';
-            return `Berhasil! Nama: ${result.name} | Platform: ${result.platform} | Reward: ${result.reward||'TBA'} | Tasks: ${tasks} | ID: ${saved.id}`;
+                const started = await browserUseClient.runTask(task);
+                if (started.liveUrl) {
+                    await bot.sendMessage(chatId, `👁️ Live preview: ${started.liveUrl}`, { disable_web_page_preview: false }).catch(() => {});
+                }
+                const result = await browserUseClient.waitForTask(started.task_id, 60000);
+                const output = result.task?.output || result.task?.result || 'Tidak dapat menganalisis halaman';
+                return `✅ Analisis selesai:
+
+${output}`;
+            }
+
+            // Fallback: fetch biasa
+            try {
+                const res = await fetch(url, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                    signal: AbortSignal.timeout(15000)
+                });
+                const html = await res.text();
+                // Ambil teks dari HTML (strip tags)
+                const text = html
+                    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .substring(0, 2000);
+
+                if (!text || text.length < 50) return `❌ Halaman tidak bisa diakses atau kosong. Coba set BROWSER_USE_API_KEY untuk akses penuh.`;
+                return `📄 Konten dari ${url}:
+
+${text}
+
+💡 Untuk analisis lebih detail, set BROWSER_USE_API_KEY di Railway.`;
+            } catch (e) {
+                if (universalScraper) {
+                    const result = await universalScraper.learnFromLink(url, { useAI: false });
+                    if (result.success) {
+                        const tasks = (result.tasks||[]).map((t, i) => `${i+1}. ${t.type}: ${t.label}`).join(', ') || '-';
+                        return `Nama: ${result.name} | Platform: ${result.platform} | Reward: ${result.reward||'TBA'} | Tasks: ${tasks}`;
+                    }
+                }
+                return `❌ Tidak bisa mengakses link: ${e.message}
+
+Set BROWSER_USE_API_KEY untuk akses penuh.`;
+            }
         },
 
         async autofill_airdrop_form({ url } = {}) {
