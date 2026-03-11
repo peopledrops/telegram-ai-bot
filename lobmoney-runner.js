@@ -1,16 +1,12 @@
-#!/usr/bin/env node
 // lobmoney-runner.js - LobMoney AI Player Runner for Railway
-// Menjalankan AI player dari repo resmi: https://github.com/fungame2026/gameplay
-// Deploy ini sebagai SERVICE TERPISAH di Railway (bukan di bot Telegram)
-
 require('dotenv').config();
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const API_KEY = process.env.LOBMONEY_API_KEY;
-const SERVER = process.env.LOBMONEY_SERVER || 'as'; // 'as' = Asia, 'na' = North America
-const REPO_URL = 'https://github.com/fungame2026/gameplay.git';
+const SERVER = process.env.LOBMONEY_SERVER || 'as';
 const WORK_DIR = '/app/gameplay';
 
 async function apiCall(endpoint, method = 'GET', body = null) {
@@ -25,13 +21,41 @@ async function apiCall(endpoint, method = 'GET', body = null) {
     return res.json();
 }
 
+// Download file pakai Node.js native https (tidak butuh wget/curl/git)
+function downloadFile(url, destPath) {
+    return new Promise((resolve, reject) => {
+        console.log(`📥 Downloading: ${url}`);
+        const file = fs.createWriteStream(destPath);
+
+        function doRequest(reqUrl) {
+            https.get(reqUrl, (res) => {
+                // Handle redirect
+                if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+                    file.close();
+                    doRequest(res.headers.location);
+                    return;
+                }
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                    return;
+                }
+                res.pipe(file);
+                file.on('finish', () => { file.close(); resolve(); });
+            }).on('error', (err) => {
+                fs.unlink(destPath, () => {});
+                reject(err);
+            });
+        }
+        doRequest(url);
+    });
+}
+
 async function setup() {
     console.log('🎮 LobMoney AI Player - Railway Runner');
     console.log('=====================================');
 
     if (!API_KEY) {
         console.error('❌ LOBMONEY_API_KEY tidak diset!');
-        console.error('Set di Railway Variables: LOBMONEY_API_KEY=your_key');
         process.exit(1);
     }
 
@@ -39,115 +63,101 @@ async function setup() {
     console.log('🔍 Checking account...');
     const info = await apiCall('/api/agent/account_info');
     if (!info.success) {
-        console.error('❌ API Key tidak valid:', info.error || 'Unknown error');
+        console.error('❌ API Key tidak valid:', info.error);
         process.exit(1);
     }
     console.log(`✅ Account: ${info.data.nickname || 'Unnamed'}`);
     console.log(`💰 Balance: ${info.data.balance} LOBCOIN`);
     console.log(`⛏️ Gold this epoch: ${info.data.gold_balance}`);
 
-    // Download repo via zip (tidak butuh git)
-    if (!fs.existsSync(WORK_DIR)) {
-        console.log('📥 Downloading gameplay repo...');
-        const zipUrl = 'https://github.com/fungame2026/gameplay/archive/refs/heads/main.zip';
+    // Download repo kalau belum ada
+    if (!fs.existsSync(WORK_DIR) || !fs.existsSync(path.join(WORK_DIR, 'package.json'))) {
+        console.log('📥 Downloading gameplay repo via Node.js https...');
         const zipPath = '/tmp/gameplay.zip';
+        const extractDir = '/tmp/gameplay_extract';
 
         // Download zip
-        execSync(`wget -O ${zipPath} "${zipUrl}" || curl -L -o ${zipPath} "${zipUrl}"`, { stdio: 'inherit' });
+        await downloadFile(
+            'https://github.com/fungame2026/gameplay/archive/refs/heads/main.zip',
+            zipPath
+        );
+        console.log('✅ Downloaded gameplay.zip');
 
-        // Extract
-        execSync(`mkdir -p ${WORK_DIR} && unzip -o ${zipPath} -d /tmp/gameplay_extract && mv /tmp/gameplay_extract/gameplay-main/* ${WORK_DIR}/`, { stdio: 'inherit' });
-        console.log('✅ Repo downloaded and extracted');
+        // Extract pakai Node.js (unzipper module atau fallback ke unzip command)
+        fs.mkdirSync(extractDir, { recursive: true });
+        fs.mkdirSync(WORK_DIR, { recursive: true });
+
+        try {
+            execSync(`unzip -o ${zipPath} -d ${extractDir}`, { stdio: 'inherit' });
+        } catch (e) {
+            // Fallback: coba python3 unzip
+            execSync(`python3 -c "import zipfile; zipfile.ZipFile('${zipPath}').extractall('${extractDir}')"`, { stdio: 'inherit' });
+        }
+
+        // Pindahkan isi folder ke WORK_DIR
+        const extracted = fs.readdirSync(extractDir)[0];
+        execSync(`cp -r ${extractDir}/${extracted}/. ${WORK_DIR}/`, { stdio: 'inherit' });
+        console.log('✅ Repo extracted to', WORK_DIR);
     } else {
-        console.log('📁 Gameplay repo already exists, skipping download');
+        console.log('📁 Gameplay repo already exists');
     }
 
     // Install dependencies
-    console.log('📦 Installing dependencies...');
+    console.log('📦 Installing pnpm & dependencies...');
     execSync('npm install -g pnpm', { stdio: 'inherit' });
-    execSync(`cd ${WORK_DIR} && pnpm install`, { stdio: 'inherit' });
+    execSync(`cd ${WORK_DIR} && pnpm install --frozen-lockfile || pnpm install`, { stdio: 'inherit' });
     execSync(`cd ${WORK_DIR} && pnpm build`, { stdio: 'inherit' });
+    console.log('✅ Dependencies installed');
 
-    // Setup config.json dengan API key
+    // Setup config
     const configDir = path.join(WORK_DIR, 'ai-player', 'data');
     const configFile = path.join(configDir, 'config.json');
+    fs.mkdirSync(configDir, { recursive: true });
 
-    if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true });
-    }
-
-    if (!fs.existsSync(configFile)) {
-        console.log('⚙️ Creating config.json...');
-        // Buat config dengan API key yang sudah ada
-        const config = {
-            api_key: API_KEY,
-            server: SERVER === 'as' ? 'https://as.lobmoney.org' : 'https://us.lobmoney.org',
-        };
-        fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-        console.log('✅ Config created');
-    } else {
-        // Update API key di config yang ada
-        const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-        config.api_key = API_KEY;
-        fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-        console.log('✅ Config updated');
-    }
-
-    return true;
+    const config = { api_key: API_KEY };
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+    console.log('✅ Config written');
 }
 
 async function runMiner() {
-    console.log(`\n🚀 Starting AI Player on server: ${SERVER}...`);
-
+    console.log(`\n🚀 Starting AI Player (server: ${SERVER})...`);
     const aiPlayerDir = path.join(WORK_DIR, 'ai-player');
-
-    // Jalankan run.sh
     const runScript = path.join(aiPlayerDir, 'run.sh');
+
     if (!fs.existsSync(runScript)) {
-        console.error('❌ run.sh tidak ditemukan di', runScript);
+        console.error('❌ run.sh tidak ditemukan:', runScript);
         process.exit(1);
     }
 
-    // Make executable
     execSync(`chmod +x ${runScript}`);
 
     const child = spawn('bash', [runScript, SERVER], {
         cwd: aiPlayerDir,
         stdio: 'inherit',
-        env: {
-            ...process.env,
-            LOBMONEY_API_KEY: API_KEY,
-        }
+        env: { ...process.env, LOBMONEY_API_KEY: API_KEY }
     });
 
     child.on('close', (code) => {
-        console.log(`\n⚠️ AI Player exited with code ${code}`);
-        console.log('🔄 Restarting in 10 seconds...');
+        console.log(`⚠️ AI Player exited (code ${code}), restarting in 10s...`);
         setTimeout(runMiner, 10000);
     });
 
     child.on('error', (err) => {
-        console.error('❌ AI Player error:', err.message);
-        console.log('🔄 Restarting in 10 seconds...');
+        console.error('❌ Error:', err.message);
         setTimeout(runMiner, 10000);
     });
 
-    // Status reporter setiap 5 menit
+    // Status setiap 5 menit
     setInterval(async () => {
         try {
             const info = await apiCall('/api/agent/account_info');
             if (info.success) {
-                console.log(`\n📊 Status [${new Date().toLocaleTimeString('id-ID')}]`);
-                console.log(`💰 LOBCOIN: ${info.data.balance}`);
-                console.log(`⛏️ Gold Epoch: ${info.data.gold_balance}`);
+                console.log(`📊 [${new Date().toLocaleTimeString('id-ID')}] LOBCOIN: ${info.data.balance} | Gold: ${info.data.gold_balance}`);
             }
-        } catch (e) {
-            console.warn('⚠️ Status check failed:', e.message);
-        }
+        } catch (e) {}
     }, 5 * 60 * 1000);
 }
 
-// Main
 (async () => {
     try {
         await setup();
