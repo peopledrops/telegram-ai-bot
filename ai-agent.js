@@ -173,6 +173,38 @@ const TOOLS = [
     {
         type: 'function',
         function: {
+            name: 'check_lobmoney_status',
+            description: 'Cek status mining LobMoney/LOBCOIN, balance, round aktif, statistik',
+            parameters: { type: 'object', properties: {}, required: [] }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'create_lobmoney_account',
+            description: 'Buat akun agent LobMoney baru untuk mining LOBCOIN',
+            parameters: { type: 'object', properties: {}, required: [] }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_lobmoney_balance',
+            description: 'Cek balance LOBCOIN dan gold yang sudah di-mine',
+            parameters: { type: 'object', properties: {}, required: [] }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_lobmoney_rounds',
+            description: 'Lihat daftar game rounds LobMoney yang aktif dan terbaru',
+            parameters: { type: 'object', properties: {}, required: [] }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'check_wallet_balance',
             description: 'Cek saldo ETH/BNB wallet di semua chain atau chain tertentu',
             parameters: {
@@ -268,6 +300,10 @@ KEAMANAN WALLET:
 - Jangan pernah minta atau tampilkan private key user
 - Ingatkan user untuk pakai wallet khusus bot, bukan wallet utama
 - Selalu tampilkan hash transaksi dan link explorer setelah claim
+
+- Jika user sebut 'lobmoney', 'lobcoin', 'mining', 'WILD game' → panggil check_lobmoney_status
+- Jika user minta buat akun lobmoney → panggil create_lobmoney_account
+- Jika user kirim https://lobmoney.org → panggil check_lobmoney_status
 
 PENTING - JANGAN panggil wallet/balance tools kalau user hanya sapa (Hai, Hello, Halo, dll).
 Hanya panggil check_wallet_balance jika user EKSPLISIT minta cek saldo/balance.

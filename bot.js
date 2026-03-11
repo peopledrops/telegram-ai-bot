@@ -5,6 +5,15 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const aiAgent = require('./ai-agent');          // ✅ AI Agent - satu-satunya AI module
 
+// LobMoney Mining - optional (butuh: LOBMONEY_API_KEY di env)
+let lobmoney = null;
+try {
+    lobmoney = require('./lobmoney');
+    console.log('✅ LobMoney module loaded');
+} catch (e) {
+    console.log('⚠️ LobMoney module not loaded:', e.message);
+}
+
 // Browser Use Cloud - optional (butuh: BROWSER_USE_API_KEY di env)
 let browserUseClient = null;
 try {
@@ -386,6 +395,48 @@ _Klik untuk lihat browser bekerja secara real-time_`,
         async reset_conversation() {
             aiAgent.resetConversation(userId);
             return 'Percakapan direset!';
+        },
+
+        // ===== LOBMONEY MINING TOOLS =====
+        async check_lobmoney_status() {
+            if (!lobmoney) return 'LobMoney module tidak tersedia.';
+            const key = process.env.LOBMONEY_API_KEY;
+            if (!key) return 'LOBMONEY_API_KEY belum diset di Railway Variables.';
+            const status = await lobmoney.getMiningStatus();
+            return lobmoney.formatStatus(status);
+        },
+
+        async create_lobmoney_account() {
+            if (!lobmoney) return 'LobMoney module tidak tersedia.';
+            const result = await lobmoney.createAccount();
+            await bot.sendMessage(chatId,
+                `🎮 *Akun LobMoney Berhasil Dibuat!*
+
+🔑 API Key: \`${result.apiKey}\`
+👛 Wallet: \`${result.walletAddress}\`
+
+⚠️ Simpan API Key ini! Tambahkan ke Railway Variables sebagai \`LOBMONEY_API_KEY\``,
+                { parse_mode: 'Markdown' }
+            ).catch(() => {});
+            return `Akun dibuat! API Key: ${result.apiKey} | Wallet: ${result.walletAddress}`;
+        },
+
+        async get_lobmoney_balance() {
+            if (!lobmoney) return 'LobMoney module tidak tersedia.';
+            const key = process.env.LOBMONEY_API_KEY;
+            if (!key) return 'LOBMONEY_API_KEY belum diset.';
+            const bal = await lobmoney.getBalance();
+            return `LOBCOIN: ${bal.lobcoin} | Gold Epoch Ini: ${bal.goldBalance} | Wallet: ${bal.walletAddress}`;
+        },
+
+        async get_lobmoney_rounds() {
+            if (!lobmoney) return 'LobMoney module tidak tersedia.';
+            const key = process.env.LOBMONEY_API_KEY;
+            if (!key) return 'LOBMONEY_API_KEY belum diset.';
+            const rounds = await lobmoney.getRoundList();
+            const active = rounds.filter(r => r.status === 'RUNNING');
+            const recent = rounds.slice(0, 5);
+            return `Round aktif: ${active.length} | Recent rounds: ${recent.map(r => r.status).join(', ')}`;
         },
 
         // ===== WALLET / WEB3 TOOLS =====
