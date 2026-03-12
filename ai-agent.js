@@ -342,14 +342,16 @@ async function processMessage(userId, userMessage, toolExecutors) {
         // Step 1: Kirim ke AI dengan tools
         console.log(`🤖 AI Agent processing: "${userMessage.substring(0, 50)}..."`);
 
-        const response = await groq.chat.completions.create({
+        const requestParams = {
             model: DEFAULT_MODEL,
             messages: conversations.get(userId),
             tools: TOOLS,
             tool_choice: 'auto',
             max_tokens: 1500,
             temperature: 0.3,
-        });
+        };
+
+        const response = await groq.chat.completions.create(requestParams);
 
         const assistantMessage = response.choices[0].message;
         conversations.get(userId).push(assistantMessage);
