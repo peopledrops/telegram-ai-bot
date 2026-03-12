@@ -2,7 +2,6 @@
 // ⚠️ BARIS 1: Load dotenv PALING AWAL
 require('dotenv').config();
 
-const { askOpenClaw, isOpenClawOnline } = require('./openclaw-bridge');
 const TelegramBot = require('node-telegram-bot-api');
 const aiAgent = require('./ai-agent');          // ✅ AI Agent - satu-satunya AI module
 
@@ -38,7 +37,14 @@ try {
     console.log('⚠️ Web3 wallet (opsional) tidak loaded:', e.message);
     console.log('   Jalankan: npm install ethers');
 }
-const MineBeanSkill = require('./minebean');
+// MineBean - optional (butuh ethers)
+let MineBeanSkill = null;
+try {
+    MineBeanSkill = require('./minebean');
+    console.log('✅ MineBean module loaded');
+} catch (e) {
+    console.log('⚠️ MineBean module not loaded:', e.message);
+}
 const airdropManager = require('./airdrop');
 const profileManager = require('./user-profiles');
 
@@ -162,6 +168,7 @@ function splitMessage(text, maxLength = 4000) {
 }
 
 function getMineBean(userId) {
+    if (!MineBeanSkill) return null;
     if (!minebeanInstances.has(userId)) {
         minebeanInstances.set(userId, new MineBeanSkill(userId));
     }
@@ -364,7 +371,7 @@ _Klik untuk lihat browser bekerja secara real-time_`,
             const cleanValue = value.replace(/^@/, '');
             if (field === 'wallet') {
                 global.userWallets.set(userId, cleanValue.toLowerCase());
-                minebeanInstances.set(userId, new MineBeanSkill(cleanValue.toLowerCase()));
+                if (MineBeanSkill) minebeanInstances.set(userId, new MineBeanSkill(cleanValue.toLowerCase()));
             }
             await profileManager.updateProfile(userId, field, cleanValue);
             return `${field} berhasil diupdate: ${cleanValue}`;
@@ -760,7 +767,7 @@ bot.onText(/\/wallet\s+(0x[a-fA-F0-9]{40})/i, async (msg, match) => {
     const userId = msg.from.id.toString();
     const address = match[1].toLowerCase();
     global.userWallets.set(userId, address);
-    minebeanInstances.set(userId, new MineBeanSkill(address));
+    if (MineBeanSkill) minebeanInstances.set(userId, new MineBeanSkill(address));
     await bot.sendMessage(chatId, `✅ Wallet diset: \`${address}\`\n\n/minebean rewards untuk cek rewards.`, { parse_mode: 'Markdown' });
 });
 
@@ -975,7 +982,7 @@ bot.onText(/\/setprofile(?:\s+(.+))?/, async (msg, match) => {
             await profileManager.updateProfile(userId, field, value);
             if (field === 'wallet') {
                 global.userWallets.set(userId, value.toLowerCase());
-                minebeanInstances.set(userId, new MineBeanSkill(value.toLowerCase()));
+                if (MineBeanSkill) minebeanInstances.set(userId, new MineBeanSkill(value.toLowerCase()));
             }
         }
         await bot.sendMessage(chatId, `✅ **${field.toUpperCase()}** diset: \`${value}\``, { parse_mode: 'Markdown' });
