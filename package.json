@@ -1,16 +1,14 @@
 {
   "name": "telegram-ai-bot",
-  "version": "2.0.1",
-  "description": "Telegram AI Bot with Web3 wallet support",
+  "version": "2.1.0",
+  "description": "Telegram AI Bot - zero dependency Web3",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.64.0",
     "openai": "^4.47.0",
-    "ethers": "^6.13.0",
     "puppeteer-core": "^21.11.0",
     "dotenv": "^16.4.5",
     "axios": "^1.7.0"

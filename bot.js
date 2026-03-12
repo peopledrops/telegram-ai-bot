@@ -2,6 +2,7 @@
 // ⚠️ BARIS 1: Load dotenv PALING AWAL
 require('dotenv').config();
 
+const { askOpenClaw, isOpenClawOnline } = require('./openclaw-bridge');
 const TelegramBot = require('node-telegram-bot-api');
 const aiAgent = require('./ai-agent');          // ✅ AI Agent - satu-satunya AI module
 
