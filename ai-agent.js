@@ -5,9 +5,13 @@ require('dotenv').config();
 const OpenAI = require('openai');
 
 const groq = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1',
+    apiKey: process.env.POE_API_KEY || process.env.GROQ_API_KEY,
+    baseURL: process.env.POE_API_KEY ? 'https://api.poe.com/v1' : 'https://api.groq.com/openai/v1',
 });
+
+const DEFAULT_MODEL = process.env.GROQ_MODEL || (process.env.POE_API_KEY ? 'Claude-Sonnet-4.5' : 'llama-3.3-70b-versatile');
+const FAST_MODEL = process.env.POE_API_KEY ? 'Claude-Haiku-4-5' : 'llama-3.1-8b-instant';
+console.log(`🤖 AI Provider: ${process.env.POE_API_KEY ? 'Poe' : 'Groq'} | Model: ${DEFAULT_MODEL}`);
 
 // ===== TOOL DEFINITIONS (Function Calling) =====
 // AI akan otomatis memilih dan memanggil tool yang tepat
@@ -339,7 +343,7 @@ async function processMessage(userId, userMessage, toolExecutors) {
         console.log(`🤖 AI Agent processing: "${userMessage.substring(0, 50)}..."`);
 
         const response = await groq.chat.completions.create({
-            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            model: DEFAULT_MODEL,
             messages: conversations.get(userId),
             tools: TOOLS,
             tool_choice: 'auto',
@@ -394,7 +398,7 @@ async function processMessage(userId, userMessage, toolExecutors) {
 
             // Step 3: Minta AI buat respons final berdasarkan hasil tool
             const finalResponse = await groq.chat.completions.create({
-                model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+                model: DEFAULT_MODEL,
                 messages: conversations.get(userId),
                 max_tokens: 1500,
                 temperature: 0.5,
@@ -445,7 +449,7 @@ function clearAllConversations() {
 async function testConnection() {
     try {
         await groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
+            model: FAST_MODEL,
             messages: [{ role: 'user', content: 'Hi' }],
             max_tokens: 10
         });
