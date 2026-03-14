@@ -498,6 +498,88 @@ _Klik untuk lihat browser bekerja secara real-time_`,
             if (!info.hasWallet) return 'Wallet belum diset. Gunakan /setwallet di chat private.';
             return `Wallet aktif:\nAddress: ${info.address}\nChain: ${info.chain}\nSource: ${info.source}`;
         },
+
+        // ===== ANALISA & RISET TOOLS =====
+        async web_search({ query, type = 'general' }) {
+            try {
+                // Coba CoinGecko dulu untuk crypto price
+                const isCryptoQuery = type === 'price' || /harga|price|kurs|coin|token|crypto/i.test(query);
+                if (isCryptoQuery) {
+                    const coin = query.replace(/harga|price|crypto|token|coin/gi, '').trim().toLowerCase().replace(/ /g, '-');
+                    try {
+                        const cgRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(coin)}`);
+                        const cgData = await cgRes.json();
+                        if (cgData.coins && cgData.coins.length > 0) {
+                            const top = cgData.coins[0];
+                            const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${top.id}&vs_currencies=usd,idr&include_24hr_change=true&include_market_cap=true`);
+                            const priceData = await priceRes.json();
+                            const p = priceData[top.id];
+                            if (p) {
+                                return '💰 **' + top.name + ' (' + top.symbol.toUpperCase() + ')**\n' +
+                                    '💵 Harga: $' + p.usd?.toLocaleString() + ' (Rp ' + p.idr?.toLocaleString() + ')\n' +
+                                    '📈 24h: ' + p.usd_24h_change?.toFixed(2) + '%\n' +
+                                    '🏦 Market Cap: $' + (p.usd_market_cap/1e9)?.toFixed(2) + 'B';
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                // DuckDuckGo Instant Answer
+                const q = encodeURIComponent(query);
+                const res = await fetch('https://api.duckduckgo.com/?q=' + q + '&format=json&no_html=1&skip_disambig=1');
+                const data = await res.json();
+                let result = '';
+                if (data.AbstractText) result += '📖 **' + data.AbstractSource + '**: ' + data.AbstractText + '\n\n';
+                if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+                    const topics = data.RelatedTopics.filter(t => t.Text).slice(0, 4).map(t => '• ' + t.Text).join('\n');
+                    if (topics) result += '🔍 **Info terkait:**\n' + topics;
+                }
+                return result.trim() || 'Tidak ada hasil untuk: "' + query + '". Coba kata kunci berbeda.';
+            } catch (e) {
+                return 'Gagal search: ' + e.message;
+            }
+        },
+
+        async analyze_chart({ description, timeframe }) {
+            return '📊 **Cara Analisa Chart:**\n\nKirim gambar chart kamu + tulis pesan seperti:\n"Analisa chart ini ETH 4H"\n\nBot akan analisa chart yang kamu kirim! Pastikan gambar dan pesan dikirim bersamaan.';
+        },
+
+        async analyze_token({ token, aspect = 'full' }) {
+            try {
+                const searchRes = await fetch('https://api.coingecko.com/api/v3/search?query=' + encodeURIComponent(token));
+                const searchData = await searchRes.json();
+                if (!searchData.coins || searchData.coins.length === 0) return 'Token "' + token + '" tidak ditemukan.';
+                const coin = searchData.coins[0];
+                const detailRes = await fetch('https://api.coingecko.com/api/v3/coins/' + coin.id + '?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false');
+                const detail = await detailRes.json();
+                const md = detail.market_data;
+                if (!md) return 'Gagal ambil data market untuk ' + token;
+                const price = md.current_price?.usd;
+                const change24h = md.price_change_percentage_24h;
+                const change7d = md.price_change_percentage_7d;
+                const marketCap = md.market_cap?.usd;
+                const volume = md.total_volume?.usd;
+                const ath = md.ath?.usd;
+                const athChange = md.ath_change_percentage?.usd;
+                const trend = change24h > 5 ? '🟢 BULLISH' : change24h < -5 ? '🔴 BEARISH' : '🟡 NEUTRAL';
+                const emoji24h = change24h >= 0 ? '📈' : '📉';
+                let result = '🪙 **' + detail.name + ' (' + detail.symbol?.toUpperCase() + ')**\n';
+                result += '━━━━━━━━━━━━━━━\n';
+                result += '💵 Harga: $' + price?.toLocaleString() + '\n';
+                result += emoji24h + ' 24h: ' + change24h?.toFixed(2) + '% | 7d: ' + change7d?.toFixed(2) + '%\n';
+                result += '🏦 Market Cap: $' + (marketCap/1e9)?.toFixed(2) + 'B\n';
+                result += '💧 Volume 24h: $' + (volume/1e6)?.toFixed(0) + 'M\n';
+                result += '📉 vs ATH: ' + athChange?.toFixed(1) + '% ($' + ath?.toLocaleString() + ')\n';
+                result += '📋 Rank: #' + detail.market_cap_rank + '\n';
+                if (detail.description?.en) result += '\n📝 ' + detail.description.en.split('.')[0] + '.\n';
+                if (detail.categories?.length) result += '🏷️ Kategori: ' + detail.categories.slice(0,3).join(', ') + '\n';
+                result += '\n🎯 **Kesimpulan: ' + trend + '**\n';
+                result += '⚠️ _Bukan financial advice. DYOR sebelum investasi._';
+                return result;
+            } catch (e) {
+                return 'Gagal analisa token: ' + e.message;
+            }
+        },
     };
 }
 
@@ -1116,3 +1198,83 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 module.exports = bot;
+
+// ===== PHOTO/CHART HANDLER =====
+bot.on('photo', async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const caption = msg.caption || '';
+
+    // Simpan info gambar terakhir untuk analisa
+    if (!global.lastChartImage) global.lastChartImage = {};
+    global.lastChartImage[userId] = {
+        fileId: msg.photo[msg.photo.length - 1].file_id,
+        caption,
+        timestamp: Date.now()
+    };
+
+    try {
+        await bot.sendChatAction(chatId, 'typing');
+
+        // Ambil file URL dari Telegram
+        const file = await bot.getFile(msg.photo[msg.photo.length - 1].file_id);
+        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+
+        // Kirim ke AI dengan gambar (vision) jika provider support
+        const userMessage = caption || 'Analisa chart ini dan berikan pendapat teknikal lengkap (trend, support, resistance, rekomendasi)';
+        console.log(`📸 [${msg.from.username||userId}]: Photo + "${userMessage.substring(0,40)}"`);
+
+        // Cek apakah provider support vision
+        const hasVision = process.env.DEEPSEK_API_KEY || process.env.POE_API_KEY;
+
+        if (hasVision) {
+            // Kirim dengan image URL ke AI vision
+            const { OpenAI } = require('openai');
+            const AI_PROVIDER = process.env.DEEPSEK_API_KEY ? 'deepseek' : 'poe';
+            const visionClient = new OpenAI({
+                apiKey: process.env.DEEPSEK_API_KEY || process.env.POE_API_KEY,
+                baseURL: AI_PROVIDER === 'deepseek' ? 'https://api.deepseek.com/v1' : 'https://api.poe.com/v1',
+            });
+
+            const visionModel = AI_PROVIDER === 'deepseek' ? 'deepseek-chat' : 'Claude-Sonnet-4.5';
+
+            const response = await visionClient.chat.completions.create({
+                model: visionModel,
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image_url',
+                            image_url: { url: fileUrl }
+                        },
+                        {
+                            type: 'text',
+                            text: `Kamu adalah analis crypto profesional. ${userMessage}\n\nBerikan analisa teknikal lengkap dalam Bahasa Indonesia:\n1. Identifikasi coin/pair dan timeframe\n2. Trend utama (bullish/bearish/sideways)\n3. Support & resistance terdekat\n4. Indikator (RSI, MACD, MA jika terlihat)\n5. Rekomendasi: Entry, Target, Stop Loss\n6. Kesimpulan singkat dengan confidence level\n\nGunakan emoji yang relevan 📊📈📉`
+                        }
+                    ]
+                }],
+                max_tokens: 1500,
+            });
+
+            const analysis = response.choices[0].message.content;
+            const chunks = splitMessage(analysis);
+            for (const chunk of chunks) {
+                await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            }
+        } else {
+            // Fallback tanpa vision
+            await bot.sendMessage(chatId,
+                '📊 *Analisa Chart*\n\n' +
+                'Gambar chart diterima! ✅\n\n' +
+                'Untuk analisa chart dengan AI Vision, aktifkan salah satu:\n' +
+                '• `DEEPSEK_API_KEY` (DeepSeek Vision)\n' +
+                '• `POE_API_KEY` (Claude Vision via Poe)\n\n' +
+                'Sementara itu, kirim deskripsi chart kamu dalam teks untuk analisa manual.',
+                { parse_mode: 'Markdown' }
+            );
+        }
+    } catch (error) {
+        console.error('❌ Photo handler error:', error.message);
+        await bot.sendMessage(chatId, `❌ Gagal analisa chart: ${error.message}`).catch(() => {});
+    }
+});

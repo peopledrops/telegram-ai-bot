@@ -4,14 +4,33 @@
 require('dotenv').config();
 const OpenAI = require('openai');
 
+// AI Provider priority: DeepSeek > Poe > Groq
+const AI_PROVIDER = process.env.DEEPSEK_API_KEY ? 'deepseek' : process.env.POE_API_KEY ? 'poe' : 'groq';
+const AI_API_KEY = process.env.DEEPSEK_API_KEY || process.env.POE_API_KEY || process.env.GROQ_API_KEY;
+const AI_BASE_URL = {
+    deepseek: 'https://api.deepseek.com/v1',
+    poe: 'https://api.poe.com/v1',
+    groq: 'https://api.groq.com/openai/v1',
+}[AI_PROVIDER];
+
 const groq = new OpenAI({
-    apiKey: process.env.POE_API_KEY || process.env.GROQ_API_KEY,
-    baseURL: process.env.POE_API_KEY ? 'https://api.poe.com/v1' : 'https://api.groq.com/openai/v1',
+    apiKey: AI_API_KEY,
+    baseURL: AI_BASE_URL,
 });
 
-const DEFAULT_MODEL = process.env.GROQ_MODEL || (process.env.POE_API_KEY ? 'Claude-Sonnet-4.5' : 'llama-3.3-70b-versatile');
-const FAST_MODEL = process.env.POE_API_KEY ? 'Claude-Haiku-4-5' : 'llama-3.1-8b-instant';
-console.log(`🤖 AI Provider: ${process.env.POE_API_KEY ? 'Poe' : 'Groq'} | Model: ${DEFAULT_MODEL}`);
+const DEFAULT_MODEL = process.env.GROQ_MODEL || {
+    deepseek: 'deepseek-chat',
+    poe: 'Claude-Sonnet-4.5',
+    groq: 'llama-3.3-70b-versatile',
+}[AI_PROVIDER];
+
+const FAST_MODEL = {
+    deepseek: 'deepseek-chat',
+    poe: 'Claude-Haiku-4-5',
+    groq: 'llama-3.1-8b-instant',
+}[AI_PROVIDER];
+
+console.log(`🤖 AI Provider: ${AI_PROVIDER.toUpperCase()} | Model: ${DEFAULT_MODEL}`);
 
 // ===== TOOL DEFINITIONS (Function Calling) =====
 // AI akan otomatis memilih dan memanggil tool yang tepat
@@ -274,6 +293,55 @@ const TOOLS = [
         }
     }
 ];
+
+// ===== EXTRA TOOLS =====
+TOOLS.push(
+    {
+        type: 'function',
+        function: {
+            name: 'web_search',
+            description: 'Cari informasi terbaru di internet: berita crypto, harga token, analisa market, info airdrop terbaru, berita DeFi/NFT',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Query pencarian, spesifik dan jelas' },
+                    type: { type: 'string', enum: ['news', 'price', 'general', 'airdrop'], description: 'Tipe pencarian' }
+                },
+                required: ['query']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'analyze_chart',
+            description: 'Analisa chart/grafik crypto yang dikirim user. Panggil ini jika user kirim gambar chart atau minta analisa teknikal.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    description: { type: 'string', description: 'Deskripsi singkat chart yang akan dianalisa' },
+                    timeframe: { type: 'string', description: 'Timeframe chart jika disebutkan (1h, 4h, 1d, dll)' }
+                },
+                required: ['description']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'analyze_token',
+            description: 'Analisa token/coin crypto: fundamentals, tokenomics, risiko, potensi. Gunakan saat user tanya tentang token tertentu.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string', description: 'Nama atau simbol token (BTC, ETH, dll)' },
+                    aspect: { type: 'string', enum: ['full', 'price', 'fundamentals', 'airdrop', 'risk'], description: 'Aspek analisa yang diminta' }
+                },
+                required: ['token']
+            }
+        }
+    }
+);
 
 const SYSTEM_PROMPT = `Kamu adalah asisten AI crypto & airdrop yang SANGAT PINTAR dan PROAKTIF untuk Telegram bot.
 
