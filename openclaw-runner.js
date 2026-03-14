@@ -1,106 +1,171 @@
-// openclaw-runner.js
-// Deploy OpenClaw Gateway di Railway sebagai service terpisah
-// Bot Telegram kamu terhubung ke Gateway ini via HTTP API
-
+// openclaw-runner.js - Install & run OpenClaw Gateway di Railway
 require('dotenv').config();
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 const os = require('os');
+const https = require('https');
 
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const TELEGRAM_BOT_TOKEN = process.env.OPENCLAW_TELEGRAM_TOKEN; // Bot token TERPISAH untuk OpenClaw
-const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || 'my-secret-token';
-const PORT = process.env.PORT || 18789;
+const DEEPSEK_API_KEY = process.env.DEEPSEK_API_KEY;
+const PORT = process.env.PORT || 3000;
+const HOME = os.homedir();
+const CONFIG_DIR = path.join(HOME, '.openclaw');
 
-if (!ANTHROPIC_API_KEY && !GROQ_API_KEY) {
-    console.error('❌ Set ANTHROPIC_API_KEY atau GROQ_API_KEY');
-    process.exit(1);
+function run(cmd, opts = {}) {
+    console.log(`$ ${cmd}`);
+    return execSync(cmd, { stdio: 'inherit', ...opts });
+}
+
+function downloadFile(url, dest, redirects = 0) {
+    return new Promise((resolve, reject) => {
+        if (redirects > 5) return reject(new Error('Too many redirects'));
+        https.get(url, { headers: { 'User-Agent': 'Node.js' } }, (res) => {
+            if ([301,302,307,308].includes(res.statusCode)) {
+                return resolve(downloadFile(res.headers.location, dest, redirects + 1));
+            }
+            if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+            const file = fs.createWriteStream(dest);
+            res.pipe(file);
+            file.on('finish', () => { file.close(); resolve(); });
+        }).on('error', reject);
+    });
 }
 
 async function installOpenClaw() {
+    // Cek apakah sudah terinstall
     try {
-        execSync('openclaw --version', { stdio: 'pipe' });
-        console.log('✅ OpenClaw sudah terinstall');
+        const ver = execSync('openclaw --version', { stdio: 'pipe' }).toString().trim();
+        console.log('✅ OpenClaw already installed:', ver);
+        return;
+    } catch {}
+
+    console.log('📦 Installing OpenClaw via installer script...');
+
+    // Download installer
+    const installerPath = '/tmp/openclaw-install.sh';
+    await downloadFile('https://openclaw.ai/install.sh', installerPath);
+    fs.chmodSync(installerPath, '755');
+
+    // Jalankan installer (non-interactive)
+    try {
+        run(`bash ${installerPath} --yes --no-daemon`, {
+            env: { ...process.env, HOME, CI: '1', NONINTERACTIVE: '1' }
+        });
+    } catch (e) {
+        console.log('⚠️ Installer script failed, trying npm install...');
+        // Fallback: coba install via npm langsung dari GitHub
+        run('npm install -g https://github.com/steipete/OpenClaw/releases/latest/download/openclaw.tgz || npm install -g openclaw || npm install -g @steipete/openclaw');
+    }
+
+    // Update PATH
+    process.env.PATH = `/root/.local/bin:/root/.npm-global/bin:/usr/local/bin:${process.env.PATH}`;
+
+    try {
+        const ver = execSync('openclaw --version', { stdio: 'pipe' }).toString().trim();
+        console.log('✅ OpenClaw installed:', ver);
     } catch {
-        console.log('📦 Installing OpenClaw...');
-        execSync('npm install -g @openclaw/cli@latest', { stdio: 'inherit' });
-        console.log('✅ OpenClaw terinstall');
+        // Cari binary openclaw
+        try {
+            const which = execSync('find /root -name "openclaw" -type f 2>/dev/null | head -1', { stdio: 'pipe' }).toString().trim();
+            if (which) {
+                run(`ln -sf ${which} /usr/local/bin/openclaw`);
+                console.log('✅ OpenClaw linked:', which);
+            }
+        } catch {}
     }
 }
 
-function setupConfig() {
-    const configDir = path.join(os.homedir(), '.openclaw');
-    fs.mkdirSync(configDir, { recursive: true });
+function writeConfig() {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
 
-    // Main config
+    // Pilih AI provider
+    let modelConfig = {};
+    if (DEEPSEK_API_KEY) {
+        modelConfig = { provider: 'deepseek', apiKey: DEEPSEK_API_KEY, model: 'deepseek-chat' };
+    } else if (ANTHROPIC_API_KEY) {
+        modelConfig = { provider: 'anthropic', apiKey: ANTHROPIC_API_KEY, model: 'claude-sonnet-4-20250514' };
+    } else if (GROQ_API_KEY) {
+        modelConfig = { provider: 'groq', apiKey: GROQ_API_KEY, model: 'llama-3.3-70b-versatile' };
+    }
+
     const config = {
         gateway: {
             port: parseInt(PORT),
-            bind: '0.0.0.0', // Railway butuh 0.0.0.0 bukan loopback
-            auth: {
-                mode: 'token',
-                token: GATEWAY_TOKEN
-            },
-            http: {
-                endpoints: {
-                    chatCompletions: { enabled: true }
-                }
-            }
+            bind: '0.0.0.0',
         },
-        models: {
-            default: ANTHROPIC_API_KEY ? 'anthropic/claude-sonnet-4-20250514' : 'groq/llama-3.3-70b-versatile'
+        model: modelConfig,
+        channels: {
+            telegram: {
+                enabled: !!TELEGRAM_BOT_TOKEN,
+                botToken: TELEGRAM_BOT_TOKEN || '',
+                dmPolicy: 'open',
+            },
+            webui: {
+                enabled: true,
+                port: parseInt(PORT),
+            }
         }
     };
 
-    fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify(config, null, 2));
+    // Tulis config.json
+    fs.writeFileSync(path.join(CONFIG_DIR, 'config.json'), JSON.stringify(config, null, 2));
+    // Tulis juga config.json5 (format yang OpenClaw prefer)
+    fs.writeFileSync(path.join(CONFIG_DIR, 'clawdbot.json'), JSON.stringify(config, null, 2));
 
-    // Credentials
-    const creds = {};
-    if (ANTHROPIC_API_KEY) creds.anthropic = { apiKey: ANTHROPIC_API_KEY };
-    if (GROQ_API_KEY) creds.groq = { apiKey: GROQ_API_KEY };
-    fs.writeFileSync(path.join(configDir, 'credentials.json'), JSON.stringify(creds, null, 2));
-
-    // Telegram channel config
-    if (TELEGRAM_BOT_TOKEN) {
-        const channels = {
-            telegram: {
-                enabled: true,
-                botToken: TELEGRAM_BOT_TOKEN,
-                dmPolicy: 'open'
-            }
-        };
-        fs.writeFileSync(path.join(configDir, 'channels.json'), JSON.stringify(channels, null, 2));
-        console.log('✅ Telegram channel configured');
-    }
-
-    console.log('✅ Config written');
+    console.log('✅ Config written to', CONFIG_DIR);
+    console.log('   Provider:', modelConfig.provider || 'none');
+    console.log('   Telegram:', TELEGRAM_BOT_TOKEN ? 'enabled' : 'disabled');
 }
 
-const path = require('path');
-
-(async () => {
-    console.log('🦞 OpenClaw Gateway - Railway Runner');
-    console.log('=====================================');
-    console.log(`Port: ${PORT}`);
-    console.log(`Model: ${ANTHROPIC_API_KEY ? 'Claude (Anthropic)' : 'Groq'}`);
-
-    await installOpenClaw();
-    setupConfig();
-
+async function startGateway() {
     console.log('\n🚀 Starting OpenClaw Gateway...');
-    const gateway = spawn('openclaw', ['gateway', '--port', String(PORT), '--bind', '0.0.0.0', '--verbose'], {
+
+    // Update PATH sebelum spawn
+    process.env.PATH = `/root/.local/bin:/root/.npm-global/bin:/usr/local/bin:${process.env.PATH}`;
+
+    const child = spawn('openclaw', ['gateway', '--port', String(PORT), '--bind', '0.0.0.0'], {
         stdio: 'inherit',
-        env: { ...process.env }
+        env: {
+            ...process.env,
+            HOME,
+            OPENCLAW_CONFIG_DIR: CONFIG_DIR,
+        }
     });
 
-    gateway.on('close', (code) => {
-        console.log(`⚠️ Gateway exited (${code}), restarting in 10s...`);
-        setTimeout(() => require('child_process').execSync('node openclaw-runner.js'), 10000);
-    });
-
-    gateway.on('error', (err) => {
-        console.error('❌ Gateway error:', err.message);
+    child.on('error', (err) => {
+        console.error('❌ Failed to start openclaw gateway:', err.message);
+        console.log('🔍 Trying to find openclaw binary...');
+        try {
+            const bins = execSync('find / -name "openclaw" -type f 2>/dev/null', { stdio: 'pipe' }).toString().trim();
+            console.log('Found binaries:', bins || 'none');
+        } catch {}
         process.exit(1);
     });
+
+    child.on('close', (code) => {
+        console.log(`⚠️ Gateway exited (${code}), restarting in 10s...`);
+        setTimeout(startGateway, 10000);
+    });
+}
+
+(async () => {
+    console.log('🦞 OpenClaw Gateway - Railway');
+    console.log('==============================');
+    console.log('Node:', process.version);
+    console.log('PORT:', PORT);
+
+    if (!TELEGRAM_BOT_TOKEN) {
+        console.warn('⚠️ TELEGRAM_BOT_TOKEN tidak diset! Telegram channel tidak aktif.');
+    }
+    if (!DEEPSEK_API_KEY && !ANTHROPIC_API_KEY && !GROQ_API_KEY) {
+        console.error('❌ Set salah satu: DEEPSEK_API_KEY, ANTHROPIC_API_KEY, atau GROQ_API_KEY');
+        process.exit(1);
+    }
+
+    await installOpenClaw();
+    writeConfig();
+    await startGateway();
 })();
