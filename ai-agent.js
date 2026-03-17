@@ -4,11 +4,17 @@
 require('dotenv').config();
 const OpenAI = require('openai');
 
-// AI Provider priority: DeepSeek > Poe > Groq
-const AI_PROVIDER = process.env.DEEPSEK_API_KEY ? 'deepseek' : process.env.POE_API_KEY ? 'poe' : 'groq';
-const AI_API_KEY = process.env.DEEPSEK_API_KEY || process.env.POE_API_KEY || process.env.GROQ_API_KEY;
+// AI Provider priority: DeepSeek > Qwen(Poe) > Poe > Groq
+const AI_PROVIDER = process.env.DEEPSEK_API_KEY ? 'deepseek'
+    : process.env.QWEN_API_KEY ? 'qwen'
+    : process.env.POE_API_KEY ? 'poe'
+    : 'groq';
+
+const AI_API_KEY = process.env.DEEPSEK_API_KEY || process.env.QWEN_API_KEY || process.env.POE_API_KEY || process.env.GROQ_API_KEY;
+
 const AI_BASE_URL = {
     deepseek: 'https://api.deepseek.com/v1',
+    qwen: 'https://api.poe.com/v1',   // Qwen via Poe
     poe: 'https://api.poe.com/v1',
     groq: 'https://api.groq.com/openai/v1',
 }[AI_PROVIDER];
@@ -20,12 +26,14 @@ const groq = new OpenAI({
 
 const DEFAULT_MODEL = process.env.GROQ_MODEL || {
     deepseek: 'deepseek-chat',
+    qwen: 'Qwen-Plus',               // Qwen model via Poe
     poe: 'Claude-Sonnet-4.5',
     groq: 'llama-3.3-70b-versatile',
 }[AI_PROVIDER];
 
 const FAST_MODEL = {
     deepseek: 'deepseek-chat',
+    qwen: 'Qwen-Turbo',
     poe: 'Claude-Haiku-4-5',
     groq: 'llama-3.1-8b-instant',
 }[AI_PROVIDER];
