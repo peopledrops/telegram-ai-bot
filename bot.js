@@ -1278,3 +1278,47 @@ bot.on('photo', async (msg) => {
         await bot.sendMessage(chatId, `❌ Gagal analisa chart: ${error.message}`).catch(() => {});
     }
 });
+
+// ===== OPENCLAW AGENT (exec tools) =====
+// Setara dengan: from openclaw import Agent; agent = Agent(tools=["exec"])
+let openclawAgent = null;
+try {
+    openclawAgent = require('./openclaw-agent');
+    console.log('✅ OpenClaw Agent loaded (exec tools enabled)');
+} catch (e) {
+    console.log('⚠️ OpenClaw Agent not loaded:', e.message);
+}
+
+// Handler khusus untuk /agent command — pakai OpenClaw Agent dengan exec
+bot.onText(/\/agent(.*)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const input = match[1].trim();
+
+    if (!openclawAgent) {
+        return bot.sendMessage(chatId, '❌ OpenClaw Agent tidak tersedia.');
+    }
+    if (!input) {
+        return bot.sendMessage(chatId, '💡 *OpenClaw Agent* — AI dengan kemampuan eksekusi kode\n\nContoh:\n`/agent hitung 1000 * 365 * 24`\n`/agent buat script cek harga BTC`\n`/agent analisa data: [1,5,3,8,2,9]`', { parse_mode: 'Markdown' });
+    }
+
+    try {
+        await bot.sendChatAction(chatId, 'typing');
+        console.log(`🤖 OpenClaw Agent [${userId}]: ${input.substring(0, 60)}`);
+        const result = await openclawAgent.run(userId, input);
+        const chunks = splitMessage(result);
+        for (const chunk of chunks) {
+            await bot.sendMessage(chatId, chunk, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        }
+    } catch (e) {
+        console.error('❌ OpenClaw Agent error:', e.message);
+        await bot.sendMessage(chatId, `❌ Agent error: ${e.message}`);
+    }
+});
+
+// /resetagent — reset history OpenClaw Agent
+bot.onText(/\/resetagent/, async (msg) => {
+    const userId = msg.from.id.toString();
+    if (openclawAgent) openclawAgent.reset(userId);
+    await bot.sendMessage(msg.chat.id, '✅ OpenClaw Agent history direset.');
+});
