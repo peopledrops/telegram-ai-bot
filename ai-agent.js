@@ -307,6 +307,36 @@ TOOLS.push(
     {
         type: 'function',
         function: {
+            name: 'polymarket_predict',
+            description: 'Cek prediksi dan odds dari Polymarket untuk event apapun: politik, crypto, olahraga, ekonomi. Panggil saat user tanya prediksi atau kemungkinan suatu event.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Topik atau event yang mau diprediksi (contoh: Bitcoin price 2026, US election, World Cup)' },
+                    category: { type: 'string', enum: ['crypto', 'politics', 'sports', 'economics', 'all'], description: 'Kategori event' }
+                },
+                required: ['query']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'get_news',
+            description: 'Ambil berita terbaru tentang topik apapun dari sumber terpercaya. Panggil saat user minta update berita, info terkini, atau konteks suatu event.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    topic: { type: 'string', description: 'Topik berita yang dicari' },
+                    limit: { type: 'number', description: 'Jumlah berita (default 5)' }
+                },
+                required: ['topic']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'token_swap',
             description: 'Bantu user swap/tukar token via DEX (Uniswap, Aerodrome, dll di Base/ETH/BSC). Panggil saat user minta swap, tukar, atau beli token.',
             parameters: {
@@ -437,6 +467,14 @@ KEAMANAN WALLET:
 PENTING - JANGAN panggil wallet/balance tools kalau user hanya sapa (Hai, Hello, Halo, dll).
 Hanya panggil check_wallet_balance jika user EKSPLISIT minta cek saldo/balance.
 Hanya panggil claim_airdrop_onchain jika user EKSPLISIT minta claim dengan contract address.
+
+POLYMARKET & PREDIKSI:
+- Jika user tanya prediksi event, politik, crypto, olahraga → panggil polymarket_predict
+- Jika user tanya "odds", "peluang", "kemungkinan", "siapa yang menang" → panggil polymarket_predict
+- Jika user tanya berita terbaru tentang suatu topik → panggil get_news
+- Jika user tanya "apa yang terjadi dengan X", "update terbaru" → panggil get_news
+- Selalu kombinasikan polymarket_predict + get_news untuk analisa lengkap
+- Format: tampilkan odds, volume, tren, dan berita terkait
 
 TOKEN SWAP (DEX):
 - Jika user minta swap token ("swap ETH ke USDC", "tukar BTC", dll) → panggil token_swap

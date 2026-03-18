@@ -499,6 +499,143 @@ _Klik untuk lihat browser bekerja secara real-time_`,
             return `Wallet aktif:\nAddress: ${info.address}\nChain: ${info.chain}\nSource: ${info.source}`;
         },
 
+        // ===== POLYMARKET PREDICT =====
+        async polymarket_predict({ query, category = 'all' }) {
+            try {
+                // Fetch dari Polymarket API (publik, no key needed)
+                const encoded = encodeURIComponent(query);
+                const res = await fetch(`https://gamma-api.polymarket.com/markets?search=${encoded}&limit=5&active=true`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+
+                if (!res.ok) throw new Error(`API error ${res.status}`);
+                const markets = await res.json();
+
+                if (!markets || markets.length === 0) {
+                    // Fallback: coba tanpa filter active
+                    const res2 = await fetch(`https://gamma-api.polymarket.com/markets?search=${encoded}&limit=5`);
+                    const markets2 = await res2.json();
+                    if (!markets2 || markets2.length === 0) {
+                        return `❓ Tidak ada market Polymarket untuk "${query}". Coba keyword berbeda.
+
+🔗 Cek langsung: https://polymarket.com/search?q=${encoded}`;
+                    }
+                    return formatMarkets(markets2, query);
+                }
+
+                return formatMarkets(markets, query);
+
+                function formatMarkets(markets, query) {
+                    let result = `🎯 **Polymarket Prediksi: "${query}"**
+━━━━━━━━━━━━━━━
+`;
+
+                    markets.slice(0, 4).forEach((m, i) => {
+                        const yesPrice = m.outcomePrices ? JSON.parse(m.outcomePrices)[0] : m.bestBid || 0;
+                        const noPrice = m.outcomePrices ? JSON.parse(m.outcomePrices)[1] : m.bestAsk || 0;
+                        const yesPct = (parseFloat(yesPrice) * 100).toFixed(1);
+                        const noPct = (parseFloat(noPrice) * 100).toFixed(1);
+                        const volume = m.volume ? `$${parseFloat(m.volume).toLocaleString()}` : 'N/A';
+                        const liquidity = m.liquidity ? `$${parseFloat(m.liquidity).toLocaleString()}` : 'N/A';
+
+                        const trend = parseFloat(yesPct) > 60 ? '📈 LIKELY' : parseFloat(yesPct) < 40 ? '📉 UNLIKELY' : '⚖️ TOSS UP';
+
+                        result += `
+**${i+1}. ${m.question || m.title}**
+`;
+                        result += `   ✅ YES: ${yesPct}% | ❌ NO: ${noPct}%
+`;
+                        result += `   ${trend}
+`;
+                        result += `   💰 Volume: ${volume} | 💧 Liquidity: ${liquidity}
+`;
+                        if (m.endDate) result += `   📅 Ends: ${new Date(m.endDate).toLocaleDateString('id-ID')}
+`;
+                        if (m.conditionId || m.slug) result += `   🔗 https://polymarket.com/event/${m.slug || m.conditionId}
+`;
+                    });
+
+                    result += `
+⚠️ _Odds berubah real-time. Ini bukan financial advice._
+`;
+                    result += `🔗 Lihat semua: https://polymarket.com/search?q=${encodeURIComponent(query)}`;
+                    return result;
+                }
+            } catch(e) {
+                return `❌ Gagal ambil data Polymarket: ${e.message}
+🔗 Cek langsung: https://polymarket.com/search?q=${encodeURIComponent(query)}`;
+            }
+        },
+
+        // ===== GET NEWS =====
+        async get_news({ topic, limit = 5 }) {
+            try {
+                // DuckDuckGo news search
+                const encoded = encodeURIComponent(topic);
+                const res = await fetch(`https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&skip_disambig=1&t=news`);
+                const data = await res.json();
+
+                let result = `📰 **Berita Terbaru: "${topic}"**
+━━━━━━━━━━━━━━━
+`;
+
+                // Abstract
+                if (data.AbstractText) {
+                    result += `
+📖 **Ringkasan:** ${data.AbstractText}
+`;
+                }
+
+                // Related topics as news
+                const topics = (data.RelatedTopics || []).filter(t => t.Text && t.FirstURL).slice(0, limit);
+                if (topics.length > 0) {
+                    result += `
+**Artikel Terkait:**
+`;
+                    topics.forEach((t, i) => {
+                        result += `
+${i+1}. ${t.Text}
+   🔗 ${t.FirstURL}
+`;
+                    });
+                }
+
+                // Fallback jika tidak ada hasil
+                if (!data.AbstractText && topics.length === 0) {
+                    // Coba CoinGecko news untuk crypto topics
+                    const cryptoKeywords = ['bitcoin', 'ethereum', 'crypto', 'btc', 'eth', 'defi', 'nft', 'blockchain'];
+                    const isCrypto = cryptoKeywords.some(k => topic.toLowerCase().includes(k));
+
+                    if (isCrypto) {
+                        const cgRes = await fetch(`https://api.coingecko.com/api/v3/search?query=${encoded}`);
+                        const cgData = await cgRes.json();
+                        if (cgData.coins && cgData.coins.length > 0) {
+                            const coin = cgData.coins[0];
+                            result += `
+🪙 Token terkait: ${coin.name} (${coin.symbol.toUpperCase()})
+`;
+                            result += `📊 Market Cap Rank: #${coin.market_cap_rank || 'N/A'}
+`;
+                            result += `🔗 https://coingecko.com/en/coins/${coin.id}
+`;
+                        }
+                    }
+
+                    result += `
+🔍 Cari berita lebih lengkap:
+`;
+                    result += `• Google: https://news.google.com/search?q=${encoded}
+`;
+                    result += `• Twitter: https://twitter.com/search?q=${encoded}
+`;
+                }
+
+                return result;
+            } catch(e) {
+                return `❌ Gagal ambil berita: ${e.message}`;
+            }
+        },
+
         // ===== TOKEN SWAP =====
         async token_swap({ tokenIn, tokenOut, amount, chain = 'base' }) {
             try {
@@ -681,11 +818,8 @@ Kirim "cek semua airdrop" untuk list lengkap.`;
 `;
                 result += `🔗 Cek eligibility: ${airdrop.checker}
 `;
-                if (walletAddr) result += `
-💼 Wallet kamu: \`${walletAddr}\`
-Buka link di atas dan connect wallet untuk cek eligibility.`;
-                else result += `
-💡 Set wallet dulu dengan /setwallet untuk cek eligibility otomatis.`;
+                if (walletAddr) result += '\n\ud83d\udcbc Wallet kamu: `' + walletAddr + '`\nBuka link di atas dan connect wallet untuk cek eligibility.';
+                else result += '\n\ud83d\udca1 Set wallet dulu dengan /setwallet untuk cek eligibility otomatis.';
 
                 return result;
             } catch(e) {
