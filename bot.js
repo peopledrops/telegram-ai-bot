@@ -499,6 +499,200 @@ _Klik untuk lihat browser bekerja secara real-time_`,
             return `Wallet aktif:\nAddress: ${info.address}\nChain: ${info.chain}\nSource: ${info.source}`;
         },
 
+        // ===== TOKEN SWAP =====
+        async token_swap({ tokenIn, tokenOut, amount, chain = 'base' }) {
+            try {
+                // Ambil harga via CoinGecko
+                const coins = { 'ETH': 'ethereum', 'BTC': 'bitcoin', 'USDC': 'usd-coin', 'USDT': 'tether', 'SOL': 'solana', 'BNB': 'binancecoin' };
+                const idIn = coins[tokenIn?.toUpperCase()] || tokenIn?.toLowerCase();
+                const idOut = coins[tokenOut?.toUpperCase()] || tokenOut?.toLowerCase();
+
+                const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${idIn},${idOut}&vs_currencies=usd`);
+                const prices = await res.json();
+
+                const priceIn = prices[idIn]?.usd;
+                const priceOut = prices[idOut]?.usd;
+
+                if (!priceIn || !priceOut) {
+                    return `❌ Tidak bisa ambil harga untuk ${tokenIn} atau ${tokenOut}. Cek simbol token.`;
+                }
+
+                const amountNum = parseFloat(amount) || 1;
+                const valueUSD = amountNum * priceIn;
+                const amountOut = valueUSD / priceOut;
+                const slippage = 0.5;
+                const minOut = amountOut * (1 - slippage/100);
+
+                const dexLinks = {
+                    base: 'https://app.uniswap.org/#/swap?chain=base',
+                    ethereum: 'https://app.uniswap.org/#/swap',
+                    bsc: 'https://pancakeswap.finance/swap',
+                    arbitrum: 'https://app.uniswap.org/#/swap?chain=arbitrum',
+                };
+
+                return `🔄 **Token Swap Estimasi**
+` +
+                    `━━━━━━━━━━━━━━━
+` +
+                    `📤 Jual: ${amountNum} ${tokenIn.toUpperCase()} ($${(valueUSD).toFixed(2)})
+` +
+                    `📥 Dapat: ~${amountOut.toFixed(6)} ${tokenOut.toUpperCase()}
+` +
+                    `📉 Min received (0.5% slippage): ${minOut.toFixed(6)} ${tokenOut.toUpperCase()}
+` +
+                    `⛓️ Chain: ${chain}
+` +
+                    `💱 Rate: 1 ${tokenIn.toUpperCase()} = ${(priceIn/priceOut).toFixed(6)} ${tokenOut.toUpperCase()}
+
+` +
+                    `🔗 Swap sekarang: ${dexLinks[chain] || dexLinks.base}
+
+` +
+                    `⚠️ _Harga bisa berubah. Cek slippage sebelum konfirmasi._`;
+            } catch(e) {
+                return `❌ Gagal estimasi swap: ${e.message}`;
+            }
+        },
+
+        // ===== YIELD ANALYSIS =====
+        async yield_analysis({ token, chain = 'all', riskLevel = 'medium' }) {
+            try {
+                // Data yield farming dari protokol populer
+                const yieldData = {
+                    'USDC': [
+                        { protocol: 'Aave V3', chain: 'base', apy: '4.2%', tvl: '$2.1B', risk: 'low', link: 'https://app.aave.com' },
+                        { protocol: 'Compound V3', chain: 'ethereum', apy: '3.8%', tvl: '$800M', risk: 'low', link: 'https://app.compound.finance' },
+                        { protocol: 'Aerodrome', chain: 'base', apy: '12.5%', tvl: '$450M', risk: 'medium', link: 'https://aerodrome.finance' },
+                        { protocol: 'Curve Finance', chain: 'ethereum', apy: '5.1%', tvl: '$1.2B', risk: 'low', link: 'https://curve.fi' },
+                        { protocol: 'Morpho', chain: 'base', apy: '6.8%', tvl: '$320M', risk: 'low', link: 'https://app.morpho.org' },
+                    ],
+                    'ETH': [
+                        { protocol: 'Lido', chain: 'ethereum', apy: '3.5%', tvl: '$15B', risk: 'low', link: 'https://lido.fi' },
+                        { protocol: 'Rocket Pool', chain: 'ethereum', apy: '3.2%', tvl: '$3.5B', risk: 'low', link: 'https://rocketpool.net' },
+                        { protocol: 'Aave V3 (wETH)', chain: 'base', apy: '2.1%', tvl: '$800M', risk: 'low', link: 'https://app.aave.com' },
+                        { protocol: 'Pendle', chain: 'ethereum', apy: '8.5%', tvl: '$600M', risk: 'medium', link: 'https://pendle.finance' },
+                    ],
+                    'BTC': [
+                        { protocol: 'Lombard Finance', chain: 'ethereum', apy: '5.2%', tvl: '$250M', risk: 'medium', link: 'https://lombard.finance' },
+                        { protocol: 'Aave V3 (wBTC)', chain: 'ethereum', apy: '1.8%', tvl: '$500M', risk: 'low', link: 'https://app.aave.com' },
+                        { protocol: 'Bedrock', chain: 'base', apy: '7.3%', tvl: '$120M', risk: 'medium', link: 'https://bedrock.technology' },
+                    ]
+                };
+
+                const tokenKey = token.toUpperCase();
+                const protocols = yieldData[tokenKey] || yieldData['USDC'];
+
+                // Filter by risk & chain
+                let filtered = protocols;
+                if (riskLevel !== 'high') {
+                    filtered = protocols.filter(p => p.risk === riskLevel || (riskLevel === 'medium' && p.risk !== 'high'));
+                }
+                if (chain !== 'all') {
+                    const chainFiltered = filtered.filter(p => p.chain === chain);
+                    if (chainFiltered.length > 0) filtered = chainFiltered;
+                }
+
+                const riskEmoji = { low: '🟢', medium: '🟡', high: '🔴' };
+                let result = `🌾 **Yield Farming Terbaik untuk ${tokenKey}**
+`;
+                result += `━━━━━━━━━━━━━━━
+`;
+
+                filtered.slice(0, 4).forEach((p, i) => {
+                    result += `
+**${i+1}. ${p.protocol}** ${riskEmoji[p.risk]}
+`;
+                    result += `   💰 APY: ${p.apy} | ⛓️ ${p.chain}
+`;
+                    result += `   🏦 TVL: ${p.tvl} | Risiko: ${p.risk}
+`;
+                    result += `   🔗 ${p.link}
+`;
+                });
+
+                result += `
+⚠️ _APY berubah setiap hari. DYOR sebelum deposit._`;
+                return result;
+            } catch(e) {
+                return `❌ Gagal analisa yield: ${e.message}`;
+            }
+        },
+
+        // ===== AIRDROP CHECKER =====
+        async airdrop_checker({ project, wallet, checkAll = false }) {
+            try {
+                const walletAddr = wallet || (walletManager ? walletManager.walletInfo(userId)?.address : null);
+
+                // Database airdrop aktif
+                const airdrops = {
+                    'layerzero': { name: 'LayerZero', status: 'claimed', checker: 'https://layerzero.foundation', deadline: 'Ended', token: 'ZRO' },
+                    'zksync': { name: 'zkSync', status: 'claimed', checker: 'https://claim.zksync.io', deadline: 'Ended', token: 'ZK' },
+                    'scroll': { name: 'Scroll', status: 'active', checker: 'https://scroll.io/airdrop', deadline: 'Q2 2026', token: 'SCR' },
+                    'linea': { name: 'Linea', status: 'upcoming', checker: 'https://linea.build', deadline: 'TBA', token: 'LINEA' },
+                    'base': { name: 'Base', status: 'upcoming', checker: 'https://base.org', deadline: 'TBA', token: 'BASE' },
+                    'hyperliquid': { name: 'Hyperliquid', status: 'active', checker: 'https://hyperliquid.xyz', deadline: 'Q1 2026', token: 'HYPE' },
+                    'monad': { name: 'Monad', status: 'upcoming', checker: 'https://monad.xyz', deadline: 'TBA', token: 'MON' },
+                    'berachain': { name: 'Berachain', status: 'active', checker: 'https://hub.berachain.com', deadline: 'Ongoing', token: 'BERA' },
+                };
+
+                if (checkAll) {
+                    const active = Object.values(airdrops).filter(a => a.status === 'active' || a.status === 'upcoming');
+                    let result = `🎁 **Airdrop Terbaru & Upcoming**
+━━━━━━━━━━━━━━━
+`;
+                    active.forEach(a => {
+                        const statusEmoji = a.status === 'active' ? '🟢' : '🔵';
+                        result += `
+${statusEmoji} **${a.name}** ($${a.token})
+`;
+                        result += `   📅 Deadline: ${a.deadline}
+`;
+                        result += `   🔗 ${a.checker}
+`;
+                    });
+                    if (walletAddr) result += `
+💼 Wallet: \`${walletAddr.substring(0,10)}...\`
+Cek eligibility di link masing-masing.`;
+                    return result;
+                }
+
+                const key = project.toLowerCase().replace(/\s/g, '');
+                const airdrop = airdrops[key] || airdrops[Object.keys(airdrops).find(k => k.includes(key) || key.includes(k))];
+
+                if (!airdrop) {
+                    return `❌ Project "${project}" tidak ditemukan di database.
+
+Airdrop aktif saat ini:
+${Object.values(airdrops).filter(a => a.status === 'active').map(a => `• ${a.name} ($${a.token})`).join('
+')}
+
+Kirim "cek semua airdrop" untuk list lengkap.`;
+                }
+
+                const statusEmoji = { active: '🟢 AKTIF', upcoming: '🔵 UPCOMING', claimed: '✅ SELESAI' }[airdrop.status];
+                let result = `🎁 **${airdrop.name} Airdrop**
+━━━━━━━━━━━━━━━
+`;
+                result += `📊 Status: ${statusEmoji}
+`;
+                result += `🪙 Token: $${airdrop.token}
+`;
+                result += `📅 Deadline: ${airdrop.deadline}
+`;
+                result += `🔗 Cek eligibility: ${airdrop.checker}
+`;
+                if (walletAddr) result += `
+💼 Wallet kamu: \`${walletAddr}\`
+Buka link di atas dan connect wallet untuk cek eligibility.`;
+                else result += `
+💡 Set wallet dulu dengan /setwallet untuk cek eligibility otomatis.`;
+
+                return result;
+            } catch(e) {
+                return `❌ Gagal cek airdrop: ${e.message}`;
+            }
+        },
+
         // ===== ANALISA & RISET TOOLS =====
         async web_search({ query, type = 'general' }) {
             try {

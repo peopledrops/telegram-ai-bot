@@ -307,6 +307,55 @@ TOOLS.push(
     {
         type: 'function',
         function: {
+            name: 'token_swap',
+            description: 'Bantu user swap/tukar token via DEX (Uniswap, Aerodrome, dll di Base/ETH/BSC). Panggil saat user minta swap, tukar, atau beli token.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    tokenIn: { type: 'string', description: 'Token yang mau dijual (ETH, USDC, BTC, dll)' },
+                    tokenOut: { type: 'string', description: 'Token yang mau dibeli' },
+                    amount: { type: 'string', description: 'Jumlah yang mau di-swap' },
+                    chain: { type: 'string', description: 'Chain yang dipakai (base, ethereum, bsc)', enum: ['base', 'ethereum', 'bsc', 'arbitrum'] }
+                },
+                required: ['tokenIn', 'tokenOut']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'yield_analysis',
+            description: 'Analisa yield farming dan liquidity pool terbaik. Panggil saat user tanya APY, passive income, farming, staking terbaik.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string', description: 'Token yang mau di-farm (USDC, ETH, BTC, dll)' },
+                    chain: { type: 'string', description: 'Chain preference (base, ethereum, bsc, all)' },
+                    riskLevel: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Toleransi risiko user' }
+                },
+                required: ['token']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'airdrop_checker',
+            description: 'Cek eligibility airdrop untuk wallet tertentu atau project tertentu. Panggil saat user tanya apakah eligible airdrop.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    project: { type: 'string', description: 'Nama project airdrop (Arbitrum, zkSync, Scroll, dll)' },
+                    wallet: { type: 'string', description: 'Wallet address user (0x...)' },
+                    checkAll: { type: 'boolean', description: 'Cek semua airdrop terbaru jika true' }
+                },
+                required: ['project']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'web_search',
             description: 'Cari informasi terbaru di internet: berita crypto, harga token, analisa market, info airdrop terbaru, berita DeFi/NFT',
             parameters: {
@@ -388,6 +437,26 @@ KEAMANAN WALLET:
 PENTING - JANGAN panggil wallet/balance tools kalau user hanya sapa (Hai, Hello, Halo, dll).
 Hanya panggil check_wallet_balance jika user EKSPLISIT minta cek saldo/balance.
 Hanya panggil claim_airdrop_onchain jika user EKSPLISIT minta claim dengan contract address.
+
+TOKEN SWAP (DEX):
+- Jika user minta swap token ("swap ETH ke USDC", "tukar BTC", dll) → panggil token_swap
+- Jika user sebut slippage, DEX, Uniswap, swap → panggil token_swap
+- Selalu tampilkan: token in, token out, estimasi harga, slippage, dan link explorer
+
+YIELD FARMING:
+- Jika user tanya "yield terbaik", "farming USDC", "APY tertinggi", "pool mana yang bagus" → panggil yield_analysis
+- Jika user tanya passive income dari crypto → panggil yield_analysis
+- Tampilkan: protocol, APY, TVL, risiko, chain, link
+
+AIRDROP CHECKER:
+- Jika user tanya "apakah saya eligible", "cek airdrop", "saya dapat airdrop tidak" → panggil airdrop_checker
+- Jika user sebut nama project + wallet → panggil airdrop_checker
+- Tampilkan: status eligibility, jumlah token (jika ada), deadline claim, link claim
+
+FORMAT RESPONS SWAP/YIELD/AIRDROP:
+- Gunakan emoji: 🔄 untuk swap, 🌾 untuk yield, 🎁 untuk airdrop
+- Selalu sertakan disclaimer singkat untuk trading/investasi
+- Berikan rekomendasi actionable, bukan hanya data
 
 Kamu adalah asisten yang BERTINDAK, bukan yang hanya menjelaskan.`;
 
