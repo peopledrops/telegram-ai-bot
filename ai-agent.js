@@ -307,6 +307,248 @@ TOOLS.push(
     {
         type: 'function',
         function: {
+            name: 'p2p_swap_create',
+            description: 'Buat order swap token P2P. User mau tukar token A dengan token B. Bot carikan match otomatis.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    giveToken: { type: 'string', description: 'Token yang user mau berikan (BNB, ETH, dll)' },
+                    giveAmount: { type: 'string', description: 'Jumlah token yang diberikan' },
+                    wantToken: { type: 'string', description: 'Token yang user mau dapatkan (POL, MATIC, dll)' },
+                    wantAmount: { type: 'string', description: 'Jumlah token yang diinginkan (opsional, auto-hitung jika kosong)' }
+                },
+                required: ['giveToken', 'giveAmount', 'wantToken']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_swap_find',
+            description: 'Cari order swap P2P yang cocok untuk user. Tampilkan siapa yang mau swap token yang diinginkan.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    orderId: { type: 'string', description: 'ID order user yang mau dicarikan match' },
+                    token: { type: 'string', description: 'Token yang dicari (opsional, untuk browse market)' }
+                }
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_swap_match',
+            description: 'Konfirmasi match antara dua order swap. Kedua user setuju untuk tukar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    myOrderId: { type: 'string', description: 'ID order user ini' },
+                    matchOrderId: { type: 'string', description: 'ID order yang mau di-match' }
+                },
+                required: ['myOrderId', 'matchOrderId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_swap_orders',
+            description: 'Lihat semua order swap user atau market terbuka.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    showMarket: { type: 'boolean', description: 'True untuk lihat semua order terbuka di market' },
+                    token: { type: 'string', description: 'Filter by token' }
+                }
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_swap_cancel',
+            description: 'Cancel order swap P2P milik user.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    orderId: { type: 'string', description: 'ID order yang mau dicancel' }
+                },
+                required: ['orderId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_create',
+            description: 'Buat escrow P2P baru. Panggil saat buyer dan seller setuju untuk transaksi dengan escrow.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    sellerContact: { type: 'string', description: 'Username/contact seller' },
+                    token: { type: 'string', description: 'Token yang diperdagangkan' },
+                    amount: { type: 'string', description: 'Jumlah token' },
+                    priceUSDC: { type: 'string', description: 'Harga total dalam USDC' },
+                    chain: { type: 'string', description: 'Chain transaksi' }
+                },
+                required: ['token', 'amount', 'priceUSDC']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_status',
+            description: 'Cek status escrow. Panggil saat user tanya status transaksi escrow.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    escrowId: { type: 'string', description: 'ID escrow (format ESC-xxx)' }
+                },
+                required: ['escrowId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_confirm_deposit',
+            description: 'Konfirmasi buyer sudah deposit USDC ke wallet escrow.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    escrowId: { type: 'string', description: 'ID escrow' },
+                    txHash: { type: 'string', description: 'Hash transaksi deposit' }
+                },
+                required: ['escrowId', 'txHash']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_confirm_token',
+            description: 'Konfirmasi seller sudah kirim token ke buyer.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    escrowId: { type: 'string', description: 'ID escrow' },
+                    txHash: { type: 'string', description: 'Hash transaksi token' }
+                },
+                required: ['escrowId', 'txHash']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_complete',
+            description: 'Selesaikan escrow dan release USDC ke seller. Panggil saat buyer konfirmasi terima token.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    escrowId: { type: 'string', description: 'ID escrow' }
+                },
+                required: ['escrowId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_dispute',
+            description: 'Buka sengketa escrow jika ada masalah.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    escrowId: { type: 'string', description: 'ID escrow' },
+                    reason: { type: 'string', description: 'Alasan dispute' }
+                },
+                required: ['escrowId', 'reason']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'escrow_my_trades',
+            description: 'Lihat semua escrow milik user.',
+            parameters: { type: 'object', properties: {} }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_create_listing',
+            description: 'Buat listing jual token P2P. Panggil saat user mau jual token ke user lain dengan harga sendiri.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string', description: 'Nama token yang dijual (BTC, ETH, USDC, dll)' },
+                    amount: { type: 'string', description: 'Jumlah token yang dijual' },
+                    priceUSDC: { type: 'string', description: 'Total harga dalam USDC' },
+                    chain: { type: 'string', description: 'Chain (base, ethereum, bsc)', enum: ['base', 'ethereum', 'bsc', 'solana'] },
+                    contact: { type: 'string', description: 'Cara pembeli menghubungi seller (username Telegram)' }
+                },
+                required: ['token', 'amount', 'priceUSDC']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_get_listings',
+            description: 'Lihat semua listing jual token P2P yang aktif. Panggil saat user mau beli token atau lihat market P2P.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string', description: 'Filter by token (opsional)' },
+                    maxPrice: { type: 'string', description: 'Filter harga maksimal USDC (opsional)' },
+                    chain: { type: 'string', description: 'Filter by chain (opsional)' }
+                }
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_my_listings',
+            description: 'Lihat listing milik user sendiri. Panggil saat user tanya listing mereka sendiri.',
+            parameters: { type: 'object', properties: {} }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_cancel_listing',
+            description: 'Cancel/hapus listing P2P milik user. Panggil saat user mau hapus listing.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    listingId: { type: 'string', description: 'ID listing yang mau dihapus (format: P2P-xxx)' }
+                },
+                required: ['listingId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'p2p_mark_sold',
+            description: 'Tandai listing sebagai sudah terjual. Panggil saat user konfirmasi token sudah terjual.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    listingId: { type: 'string', description: 'ID listing yang sudah terjual' }
+                },
+                required: ['listingId']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
             name: 'polymarket_predict',
             description: 'Cek prediksi dan odds dari Polymarket untuk event apapun: politik, crypto, olahraga, ekonomi. Panggil saat user tanya prediksi atau kemungkinan suatu event.',
             parameters: {
@@ -475,6 +717,35 @@ POLYMARKET & PREDIKSI:
 - Jika user tanya "apa yang terjadi dengan X", "update terbaru" → panggil get_news
 - Selalu kombinasikan polymarket_predict + get_news untuk analisa lengkap
 - Format: tampilkan odds, volume, tren, dan berita terkait
+
+P2P SWAP MATCHING:
+- Jika user mau tukar token dengan user lain (bukan DEX) → panggil p2p_swap_create
+- Jika user tanya siapa yang mau tukar token tertentu → panggil p2p_swap_find
+- Jika user setuju dengan match → panggil p2p_swap_match
+- Jika user mau lihat order mereka → panggil p2p_swap_orders
+- Jika user mau cancel order → panggil p2p_swap_cancel
+- Format: tampilkan nilai USD, fee 5%, dan instruksi transfer
+- PENTING: Fee 5% otomatis dipotong dari nilai transaksi
+
+ESCROW P2P:
+- Jika user mau transaksi AMAN dengan escrow → panggil escrow_create
+- Jika user tanya status escrow → panggil escrow_status
+- Jika buyer konfirmasi sudah deposit USDC → panggil escrow_confirm_deposit
+- Jika seller konfirmasi sudah kirim token → panggil escrow_confirm_token
+- Jika buyer konfirmasi terima token → panggil escrow_complete
+- Jika ada masalah/sengketa → panggil escrow_dispute
+- Jika user tanya transaksi mereka → panggil escrow_my_trades
+- SELALU ingatkan: deposit USDC ke wallet 0xfEe6E7f9389Ce9CeBFEeb77F077b6754B94eCbF6
+- Fee escrow 1% dari nilai transaksi
+
+P2P TRADING:
+- Jika user mau JUAL token → panggil p2p_create_listing
+- Jika user mau BELI token atau lihat market → panggil p2p_get_listings
+- Jika user tanya listing mereka → panggil p2p_my_listings
+- Jika user mau hapus listing → panggil p2p_cancel_listing
+- Jika token sudah terjual → panggil p2p_mark_sold
+- Format: tampilkan ID listing, harga, cara kontak seller
+- PENTING: P2P tidak escrow — ingatkan user untuk verifikasi sendiri sebelum transfer
 
 TOKEN SWAP (DEX):
 - Jika user minta swap token ("swap ETH ke USDC", "tukar BTC", dll) → panggil token_swap

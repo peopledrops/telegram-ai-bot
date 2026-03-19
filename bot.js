@@ -636,6 +636,299 @@ ${i+1}. ${t.Text}
             }
         },
 
+        // ===== P2P SWAP MATCHING =====
+        async p2p_swap_create({ giveToken, giveAmount, wantToken, wantAmount }) {
+            try {
+                const swap = require('./p2p-swap');
+                const userName = msg?.from?.username || userId;
+                const order = await swap.createSwapOrder({
+                    userId, userName, giveToken, giveAmount, wantToken, wantAmount
+                });
+
+                // Langsung cari match
+                const matches = swap.findMatch(order.id);
+
+                let result = '🔄 **Order Swap Dibuat!**\n' +
+                    '━━━━━━━━━━━━━━━\n' +
+                    '🆔 ID: **' + order.id + '**\n' +
+                    '📤 Kamu beri: ' + order.giveAmount + ' ' + order.giveToken +
+                    (order.giveValueUSD ? ' (~$' + order.giveValueUSD.toFixed(2) + ')' : '') + '\n' +
+                    '📥 Kamu mau: ' + order.wantAmount + ' ' + order.wantToken + '\n' +
+                    '💸 Fee: ' + swap.FEE_PCT + '% dipotong otomatis\n\n';
+
+                if (matches && matches.length > 0) {
+                    result += '🎯 **Match Ditemukan!**\n';
+                    matches.forEach((m, i) => {
+                        result += (i+1) + '. **[' + m.id + ']** ' + m.giveAmount + ' ' + m.giveToken +
+                            ' → ' + m.wantAmount + ' ' + m.wantToken +
+                            ' | @' + m.userName + '\n';
+                    });
+                    result += '\n✅ Setuju? Ketik: "match ' + order.id + ' [ID_MATCH]"';
+                } else {
+                    result += '⏳ Belum ada match. Order kamu aktif di market.\n' +
+                        'Bot akan otomatis carikan match jika ada yang cocok.';
+                }
+                return result;
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_swap_find({ orderId, token }) {
+            try {
+                const swap = require('./p2p-swap');
+                if (orderId) {
+                    const matches = swap.findMatch(orderId);
+                    if (!matches || matches.length === 0) return '❌ Tidak ada match untuk order ' + orderId + ' saat ini.';
+                    let result = '🎯 **Match untuk ' + orderId + ':**\n━━━━━━━━━━━━━━━\n';
+                    matches.forEach((m, i) => {
+                        result += swap.formatOrder(m, true);
+                    });
+                    result += '\nKetik: "match ' + orderId + ' [SW-xxx]" untuk konfirmasi.';
+                    return result;
+                }
+                // Browse market
+                const orders = swap.getOpenOrders(token);
+                if (orders.length === 0) return '📭 Tidak ada order swap terbuka' + (token ? ' untuk ' + token : '') + '.';
+                let result = '🏪 **P2P Swap Market**\n━━━━━━━━━━━━━━━\n';
+                orders.slice(0, 8).forEach(o => { result += swap.formatOrder(o, true); });
+                return result;
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_swap_match({ myOrderId, matchOrderId }) {
+            try {
+                const swap = require('./p2p-swap');
+                const result = swap.matchOrders(myOrderId, matchOrderId);
+                if (!result) return '❌ Order tidak ditemukan.';
+                const { order1, order2 } = result;
+                const myOrder = order1.id === myOrderId ? order1 : order2;
+                const theirOrder = order1.id === matchOrderId ? order1 : order2;
+
+                return '🤝 **Match Dikonfirmasi!**\n' +
+                    '━━━━━━━━━━━━━━━\n' +
+                    '👤 Kamu (@' + myOrder.userName + '): kirim ' + myOrder.giveAmount + ' ' + myOrder.giveToken + '\n' +
+                    '👤 Mereka (@' + theirOrder.userName + '): kirim ' + theirOrder.giveAmount + ' ' + theirOrder.giveToken + '\n\n' +
+                    '**📋 Instruksi:**\n' +
+                    '1️⃣ Kedua pihak kirim token ke wallet escrow:\n' +
+                    '`' + swap.OWNER_WALLET + '`\n' +
+                    '2️⃣ Fee ' + swap.FEE_PCT + '% dipotong otomatis\n' +
+                    '3️⃣ Bot release token ke masing-masing pihak\n\n' +
+                    '⚠️ Pastikan kirim ke wallet escrow, BUKAN langsung ke user lain!';
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_swap_orders({ showMarket = false, token }) {
+            try {
+                const swap = require('./p2p-swap');
+                if (showMarket) {
+                    const orders = swap.getOpenOrders(token);
+                    if (orders.length === 0) return '📭 Market P2P kosong' + (token ? ' untuk ' + token : '') + '.';
+                    let result = '🏪 **P2P Swap Market** (' + orders.length + ' order)\n━━━━━━━━━━━━━━━\n';
+                    orders.slice(0, 10).forEach(o => { result += swap.formatOrder(o); });
+                    return result;
+                }
+                const orders = swap.getUserOrders(userId);
+                if (orders.length === 0) return '📭 Kamu belum punya order swap.\n\n💡 Mulai: "tukar 1 BNB ke POL"';
+                let result = '📋 **Order Swap Kamu**\n━━━━━━━━━━━━━━━\n';
+                orders.slice(0, 5).forEach(o => { result += swap.formatOrder(o); });
+                return result;
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_swap_cancel({ orderId }) {
+            try {
+                const swap = require('./p2p-swap');
+                const order = swap.cancelOrder(orderId, userId);
+                if (!order) return '❌ Order ' + orderId + ' tidak ditemukan atau bukan milikmu.';
+                return '✅ Order **' + orderId + '** berhasil dicancel.';
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        // ===== ESCROW =====
+        async escrow_create({ sellerContact, token, amount, priceUSDC, chain = 'base' }) {
+            try {
+                const escrow = require('./escrow');
+                const buyerName = msg?.from?.username || userId;
+                const e = escrow.createEscrow({
+                    buyerId: userId, buyerName,
+                    sellerId: sellerContact || 'unknown',
+                    sellerName: sellerContact || 'Seller',
+                    token, amount, priceUSDC, chain
+                });
+                return '🔐 **Escrow Dibuat!**\n' +
+                    '━━━━━━━━━━━━━━━\n' +
+                    '🆔 ID: **' + e.id + '**\n' +
+                    '🪙 ' + e.amount + ' ' + e.token + ' — $' + e.priceUSDC + ' USDC\n' +
+                    '💸 Fee (1%): $' + e.fee + ' | Seller terima: $' + e.sellerReceives + '\n\n' +
+                    '**📋 Langkah selanjutnya:**\n' +
+                    '1️⃣ BUYER kirim $' + e.priceUSDC + ' USDC ke:\n' +
+                    '`' + escrow.ESCROW_WALLET + '`\n' +
+                    '2️⃣ Kirim bukti tx: "deposit ' + e.id + ' [tx_hash]"\n' +
+                    '3️⃣ SELLER kirim token setelah deposit dikonfirmasi\n' +
+                    '4️⃣ BUYER konfirmasi terima token\n' +
+                    '5️⃣ USDC otomatis release ke seller\n\n' +
+                    '⚠️ Simpan ID escrow ini!';
+            } catch(err) { return '❌ Gagal buat escrow: ' + err.message; }
+        },
+
+        async escrow_status({ escrowId }) {
+            try {
+                const escrow = require('./escrow');
+                const e = escrow.getEscrow(escrowId);
+                if (!e) return '❌ Escrow ' + escrowId + ' tidak ditemukan.';
+                return escrow.formatEscrow(e);
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        async escrow_confirm_deposit({ escrowId, txHash }) {
+            try {
+                const escrow = require('./escrow');
+                const e = escrow.confirmDeposit(escrowId, txHash);
+                if (!e) return '❌ Escrow tidak ditemukan.';
+                return '✅ **Deposit Dikonfirmasi!**\n' +
+                    '🆔 ' + escrowId + '\n' +
+                    '💰 $' + e.priceUSDC + ' USDC diterima\n' +
+                    '📋 Tx: ' + txHash + '\n\n' +
+                    '➡️ Seller (' + e.sellerName + ') silakan kirim ' + e.amount + ' ' + e.token + ' ke buyer.\n' +
+                    'Setelah kirim, konfirmasi: "token dikirim ' + escrowId + ' [tx_hash]"';
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        async escrow_confirm_token({ escrowId, txHash }) {
+            try {
+                const escrow = require('./escrow');
+                const e = escrow.confirmTokenSent(escrowId, txHash);
+                if (!e) return '❌ Escrow tidak ditemukan.';
+                return '📤 **Token Terkirim!**\n' +
+                    '🆔 ' + escrowId + '\n' +
+                    '🪙 ' + e.amount + ' ' + e.token + ' dikirim ke buyer\n' +
+                    '📋 Tx: ' + txHash + '\n\n' +
+                    '➡️ Buyer (' + e.buyerName + ') silakan konfirmasi terima token.\n' +
+                    'Ketik: "selesai ' + escrowId + '" untuk release USDC ke seller.';
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        async escrow_complete({ escrowId }) {
+            try {
+                const escrow = require('./escrow');
+                const e = escrow.completeEscrow(escrowId, 'manual-release');
+                if (!e) return '❌ Escrow tidak ditemukan.';
+                return '🎉 **Escrow Selesai!**\n' +
+                    '━━━━━━━━━━━━━━━\n' +
+                    '✅ ' + e.amount + ' ' + e.token + ' → ' + e.buyerName + '\n' +
+                    '✅ $' + e.sellerReceives + ' USDC → ' + e.sellerName + '\n' +
+                    '💸 Fee: $' + e.fee + ' USDC (CryptoClawAI)\n\n' +
+                    '⚠️ Release USDC manual ke seller: ' + e.sellerName + '\n' +
+                    'Kirim $' + e.sellerReceives + ' USDC ke wallet seller.';
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        async escrow_dispute({ escrowId, reason }) {
+            try {
+                const escrow = require('./escrow');
+                const e = escrow.disputeEscrow(escrowId, reason, userId);
+                if (!e) return '❌ Escrow tidak ditemukan.';
+                return '⚠️ **Dispute Dibuka!**\n' +
+                    '🆔 ' + escrowId + '\n' +
+                    '📝 Alasan: ' + reason + '\n\n' +
+                    'Dana USDC ditahan sampai dispute diselesaikan.\n' +
+                    'Hubungi admin untuk resolusi.';
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        async escrow_my_trades() {
+            try {
+                const escrow = require('./escrow');
+                const trades = escrow.getUserEscrows(userId);
+                if (trades.length === 0) return '📭 Kamu belum punya transaksi escrow.';
+                let result = '📋 **Transaksi Escrow Kamu**\n━━━━━━━━━━━━━━━\n';
+                trades.slice(0, 5).forEach(e => {
+                    const role = e.buyerId === userId ? '🛒 Buyer' : '💼 Seller';
+                    const statusEmoji = { pending_deposit:'⏳', funded:'💰', token_sent:'📤', completed:'✅', disputed:'⚠️', cancelled:'❌' }[e.status];
+                    result += '\n' + statusEmoji + ' **[' + e.id + ']** ' + role + '\n';
+                    result += '   ' + e.amount + ' ' + e.token + ' — $' + e.priceUSDC + ' USDC\n';
+                    result += '   Status: ' + e.status + '\n';
+                });
+                return result;
+            } catch(err) { return '❌ Error: ' + err.message; }
+        },
+
+        // ===== P2P TRADING =====
+        async p2p_create_listing({ token, amount, priceUSDC, chain = 'base', contact }) {
+            try {
+                const p2p = require('./p2p-trading');
+                const sellerName = msg?.from?.username || userId;
+                const listing = p2p.createListing({
+                    sellerId: userId,
+                    sellerName,
+                    token, amount, priceUSDC, chain,
+                    contact: contact || (sellerName ? '@' + sellerName : 'DM bot'),
+                });
+                return '✅ **Listing P2P Berhasil Dibuat!**\n' +
+                    '━━━━━━━━━━━━━━━\n' +
+                    '🆔 ID: ' + listing.id + '\n' +
+                    '🪙 Token: ' + listing.amount + ' ' + listing.token + '\n' +
+                    '💰 Harga: $' + listing.priceUSDC + ' USDC ($' + listing.pricePerUnit.toFixed(4) + '/unit)\n' +
+                    '⛓️ Chain: ' + listing.chain + '\n' +
+                    '📩 Kontak: ' + listing.contact + '\n\n' +
+                    '💡 Share ID listing ke pembeli atau tunggu mereka temukan di market.\n' +
+                    'Gunakan "hapus listing ' + listing.id + '" untuk cancel.';
+            } catch(e) { return '❌ Gagal buat listing: ' + e.message; }
+        },
+
+        async p2p_get_listings({ token, maxPrice, chain } = {}) {
+            try {
+                const p2p = require('./p2p-trading');
+                const listings = p2p.getListings({ token, maxPrice, chain });
+                if (listings.length === 0) {
+                    return '📭 Tidak ada listing P2P aktif' + (token ? ' untuk ' + token.toUpperCase() : '') + '.\n\n💡 Jadilah yang pertama jual! Ketik: "jual 1 ETH seharga 3500 USDC"';
+                }
+                let result = '🏪 **P2P Market** (' + listings.length + ' listing aktif)\n━━━━━━━━━━━━━━━\n';
+                listings.slice(0, 8).forEach((l, i) => {
+                    p2p.incrementViews(l.id);
+                    result += '\n' + (i+1) + '. **[' + l.id + '] ' + l.amount + ' ' + l.token + '**\n';
+                    result += '   💰 $' + l.priceUSDC + ' USDC ($' + l.pricePerUnit.toFixed(4) + '/unit)\n';
+                    result += '   ⛓️ ' + l.chain + ' | 👤 ' + l.sellerName + '\n';
+                    result += '   📩 Kontak: ' + l.contact + '\n';
+                });
+                result += '\n💡 Mau beli? Kontak seller langsung dan transfer USDC ke wallet mereka.';
+                return result;
+            } catch(e) { return '❌ Gagal ambil listing: ' + e.message; }
+        },
+
+        async p2p_my_listings() {
+            try {
+                const p2p = require('./p2p-trading');
+                const listings = p2p.getMyListings(userId);
+                if (listings.length === 0) return '📭 Kamu belum punya listing P2P.\n\n💡 Mulai jual: "jual 1 ETH seharga 3500 USDC"';
+                let result = '📋 **Listing Kamu**\n━━━━━━━━━━━━━━━\n';
+                listings.forEach((l, i) => {
+                    const statusEmoji = { active: '🟢', sold: '✅', cancelled: '❌' }[l.status];
+                    result += '\n' + (i+1) + '. ' + statusEmoji + ' **[' + l.id + '] ' + l.amount + ' ' + l.token + '**\n';
+                    result += '   💰 $' + l.priceUSDC + ' USDC | Status: ' + l.status + '\n';
+                    result += '   👁️ Views: ' + l.views + '\n';
+                });
+                return result;
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_cancel_listing({ listingId }) {
+            try {
+                const p2p = require('./p2p-trading');
+                const listing = p2p.cancelListing(listingId, userId);
+                if (!listing) return '❌ Listing ' + listingId + ' tidak ditemukan atau bukan milikmu.';
+                return '✅ Listing **' + listingId + '** berhasil dihapus.';
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
+        async p2p_mark_sold({ listingId }) {
+            try {
+                const p2p = require('./p2p-trading');
+                const listing = p2p.markSold(listingId, userId);
+                if (!listing) return '❌ Listing ' + listingId + ' tidak ditemukan atau bukan milikmu.';
+                return '✅ **' + listing.amount + ' ' + listing.token + '** ditandai TERJUAL!\n💰 Harga: $' + listing.priceUSDC + ' USDC\n\nSelamat! 🎉';
+            } catch(e) { return '❌ Error: ' + e.message; }
+        },
+
         // ===== TOKEN SWAP =====
         async token_swap({ tokenIn, tokenOut, amount, chain = 'base' }) {
             try {
@@ -797,27 +1090,16 @@ Cek eligibility di link masing-masing.`;
                 const airdrop = airdrops[key] || airdrops[Object.keys(airdrops).find(k => k.includes(key) || key.includes(k))];
 
                 if (!airdrop) {
-                    return `❌ Project "${project}" tidak ditemukan di database.
-
-Airdrop aktif saat ini:
-${Object.values(airdrops).filter(a => a.status === 'active').map(a => `• ${a.name} ($${a.token})`).join('
-')}
-
-Kirim "cek semua airdrop" untuk list lengkap.`;
+                    const activeList = Object.values(airdrops).filter(a => a.status === 'active').map(a => '• ' + a.name + ' ($' + a.token + ')').join('\n');
+                    return '❌ Project "' + project + '" tidak ditemukan di database.\n\nAirdrop aktif saat ini:\n' + activeList + '\n\nKirim "cek semua airdrop" untuk list lengkap.';
                 }
 
                 const statusEmoji = { active: '🟢 AKTIF', upcoming: '🔵 UPCOMING', claimed: '✅ SELESAI' }[airdrop.status];
-                let result = `🎁 **${airdrop.name} Airdrop**
-━━━━━━━━━━━━━━━
-`;
-                result += `📊 Status: ${statusEmoji}
-`;
-                result += `🪙 Token: $${airdrop.token}
-`;
-                result += `📅 Deadline: ${airdrop.deadline}
-`;
-                result += `🔗 Cek eligibility: ${airdrop.checker}
-`;
+                let result = '🎁 **' + airdrop.name + ' Airdrop**\n━━━━━━━━━━━━━━━\n';
+                result += '📊 Status: ' + statusEmoji + '\n';
+                result += '🪙 Token: $' + airdrop.token + '\n';
+                result += '📅 Deadline: ' + airdrop.deadline + '\n';
+                result += '🔗 Cek eligibility: ' + airdrop.checker + '\n';
                 if (walletAddr) result += '\n\ud83d\udcbc Wallet kamu: `' + walletAddr + '`\nBuka link di atas dan connect wallet untuk cek eligibility.';
                 else result += '\n\ud83d\udca1 Set wallet dulu dengan /setwallet untuk cek eligibility otomatis.';
 
